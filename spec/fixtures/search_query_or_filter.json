@@ -1,0 +1,14 @@
+{
+  "op": "search",
+  "args": {"query": "crispr", "collections": ["corpus"], "limit": 5,
+           "filters": {"or": [{"field": "issn", "eq": "1664-302X"}, {"field": "issn", "eq": "1932-6203"}]}},
+  "request": {"method": "POST", "path": "/api/v1/search/query",
+              "body": {"query": "crispr", "collections": ["corpus"], "limit": 5,
+                       "filters": {"or": [{"field": "issn", "eq": "1664-302X"}, {"field": "issn", "eq": "1932-6203"}]},
+                       "includeMetadata": true, "includeFigures": false,
+                       "imageMaxHeight": 600, "imageMaxWidth": 800, "imageQuality": 75}},
+  "response": {"status": 200, "headers": {},
+               "body": {"results": [{"id": "d1", "text": "t", "metadata": {"title": "T"}, "collection": "corpus"}],
+                        "queryId": "q-or", "latencyMs": 9}},
+  "expect": {"error": null, "field": "queryId", "value": "q-or"}
+}

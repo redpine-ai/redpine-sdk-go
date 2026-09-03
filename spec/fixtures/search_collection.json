@@ -1,0 +1,9 @@
+{
+  "op": "search_collection",
+  "args": {"collection": "corpus", "query": "q", "limit": 3, "include_figures": true},
+  "request": {"method": "POST", "path": "/api/v1/search/corpus",
+              "body": {"query": "q", "limit": 3, "includeMetadata": true, "includeFigures": true,
+                       "imageMaxHeight": 600, "imageMaxWidth": 800, "imageQuality": 75}},
+  "response": {"status": 200, "headers": {}, "body": {"results": [], "queryId": "q-col", "latencyMs": 2}},
+  "expect": {"error": null, "field": "queryId", "value": "q-col"}
+}

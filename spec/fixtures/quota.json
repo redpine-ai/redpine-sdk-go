@@ -1,0 +1,9 @@
+{
+  "op": "quota",
+  "args": {},
+  "request": {"method": "GET", "path": "/api/v1/search/quota", "body": null},
+  "response": {"status": 200, "headers": {},
+               "body": {"dailyLimit": 10, "dailyUsed": 1, "dailyRemaining": 9,
+                        "monthlyLimit": 100, "monthlyUsed": 1, "monthlyRemaining": 99}},
+  "expect": {"error": null, "field": "dailyRemaining", "value": 9}
+}

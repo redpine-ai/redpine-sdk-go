@@ -1,0 +1,11 @@
+{
+  "op": "search",
+  "args": {"query": "q", "collection": "corpus", "filters": {"journal": "Nature", "publication_date": {"gte": "2020-01-01"}}},
+  "request": {"method": "POST", "path": "/api/v1/search/query",
+              "body": {"query": "q", "collection": "corpus", "limit": 10,
+                       "filters": {"journal": "Nature", "publication_date": {"gte": "2020-01-01"}},
+                       "includeMetadata": true, "includeFigures": false,
+                       "imageMaxHeight": 600, "imageMaxWidth": 800, "imageQuality": 75}},
+  "response": {"status": 200, "headers": {}, "body": {"results": [], "queryId": "q-flat", "latencyMs": 3}},
+  "expect": {"error": null, "field": "queryId", "value": "q-flat"}
+}

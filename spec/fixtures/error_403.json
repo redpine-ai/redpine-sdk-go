@@ -1,0 +1,10 @@
+{
+  "op": "search",
+  "args": {"query": "q", "collection": "private"},
+  "request": {"method": "POST", "path": "/api/v1/search/query",
+              "body": {"query": "q", "collection": "private", "limit": 10, "includeMetadata": true, "includeFigures": false,
+                       "imageMaxHeight": 600, "imageMaxWidth": 800, "imageQuality": 75}},
+  "response": {"status": 403, "headers": {},
+               "body": {"error": {"code": "FORBIDDEN", "message": "no access", "requestId": "r-403"}}},
+  "expect": {"error": "AccessDenied", "field": null, "value": null}
+}

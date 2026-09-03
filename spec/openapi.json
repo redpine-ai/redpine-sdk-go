@@ -1,0 +1,1335 @@
+{
+    "components": {
+        "schemas": {
+            "AssistedBillingInfo": {
+                "description": "What was actually charged \u2014 only delivered, verified results are billed.",
+                "properties": {
+                    "chargedResults": {
+                        "description": "Number of results billed",
+                        "type": "integer"
+                    },
+                    "tokensCharged": {
+                        "description": "Tokens billed (0 for clarification/no-result)",
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "chargedResults",
+                    "tokensCharged"
+                ],
+                "type": "object"
+            },
+            "AssistedSearchRequest": {
+                "properties": {
+                    "allowClarification": {
+                        "default": true,
+                        "description": "If true, the endpoint may return a clarifying question instead of results when the query is too underspecified. Set false if your client cannot do a follow-up turn.",
+                        "type": "boolean"
+                    },
+                    "collection": {
+                        "default": null,
+                        "description": "Collection to search. Provide either this or `collections`, not both.",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "collections": {
+                        "default": null,
+                        "description": "Collections to search together (max 5). Results are merged into one relevance-ranked list and each result is labeled with its origin collection. Provide either this or 'collection', not both.",
+                        "items": {
+                            "type": "string"
+                        },
+                        "maxItems": 5,
+                        "minItems": 1,
+                        "type": [
+                            "array",
+                            "null"
+                        ]
+                    },
+                    "filters": {
+                        "additionalProperties": true,
+                        "default": null,
+                        "description": "Same filter forms as `/api/v1/search/query`; applied to every internal search.",
+                        "type": [
+                            "object",
+                            "null"
+                        ]
+                    },
+                    "imageMaxHeight": {
+                        "default": 600,
+                        "description": "Maximum image height in pixels",
+                        "maximum": 1080,
+                        "minimum": 100,
+                        "type": "integer"
+                    },
+                    "imageMaxWidth": {
+                        "default": 800,
+                        "description": "Maximum image width in pixels",
+                        "maximum": 1920,
+                        "minimum": 100,
+                        "type": "integer"
+                    },
+                    "imageQuality": {
+                        "default": 75,
+                        "description": "JPEG quality for fetched images",
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer"
+                    },
+                    "includeFigures": {
+                        "default": false,
+                        "description": "Fetch and attach figure images (base64, in metadata.figures[].image_data) for the delivered results only. Adds latency; requires `includeMetadata`. `includeImages` is accepted as a deprecated alias.",
+                        "type": "boolean"
+                    },
+                    "includeMetadata": {
+                        "default": true,
+                        "description": "Whether to include metadata in results",
+                        "type": "boolean"
+                    },
+                    "limit": {
+                        "default": 10,
+                        "description": "Maximum verified results to return.",
+                        "maximum": 30,
+                        "minimum": 1,
+                        "type": "integer"
+                    },
+                    "query": {
+                        "description": "Search query text",
+                        "maxLength": 1000,
+                        "minLength": 1,
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "query"
+                ],
+                "type": "object"
+            },
+            "AssistedSearchResponse": {
+                "properties": {
+                    "billing": {
+                        "$ref": "#/components/schemas/AssistedBillingInfo",
+                        "description": "What was billed"
+                    },
+                    "clarification": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/ClarificationInfo"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Set only when status is `clarification_needed`."
+                    },
+                    "filterWarnings": {
+                        "default": null,
+                        "description": "Advisory warnings about the supplied filter \u2014 for example filtering on a field with no payload index, which is matched by scanning. The search still runs. Omitted when there are none.",
+                        "items": {
+                            "$ref": "#/components/schemas/FilterWarning"
+                        },
+                        "type": [
+                            "array",
+                            "null"
+                        ]
+                    },
+                    "iterationsRun": {
+                        "description": "Number of search+replan rounds executed",
+                        "type": "integer"
+                    },
+                    "journalMetricExpansions": {
+                        "default": null,
+                        "description": "How each journal-metric condition resolved to ISSNs; omitted when no metric filter was used",
+                        "items": {
+                            "$ref": "#/components/schemas/JournalMetricExpansion"
+                        },
+                        "type": [
+                            "array",
+                            "null"
+                        ]
+                    },
+                    "latencyMs": {
+                        "description": "End-to-end latency in milliseconds",
+                        "type": "integer"
+                    },
+                    "queryId": {
+                        "description": "Query ID for audit reference",
+                        "type": "string"
+                    },
+                    "queryUnderstanding": {
+                        "$ref": "#/components/schemas/QueryUnderstanding",
+                        "description": "How the query was interpreted"
+                    },
+                    "results": {
+                        "description": "Verified results (empty unless status='results')",
+                        "items": {
+                            "$ref": "#/components/schemas/AssistedSearchResult"
+                        },
+                        "type": "array"
+                    },
+                    "status": {
+                        "description": "Outcome of the assisted search",
+                        "enum": [
+                            "results",
+                            "clarification_needed",
+                            "no_relevant_results"
+                        ],
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "status",
+                    "queryUnderstanding",
+                    "billing",
+                    "queryId",
+                    "latencyMs",
+                    "iterationsRun"
+                ],
+                "type": "object"
+            },
+            "AssistedSearchResult": {
+                "properties": {
+                    "collection": {
+                        "default": null,
+                        "description": "Origin collection of this result. Populated only for requests made with the 'collections' (multi-collection) form.",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "doiUrl": {
+                        "default": null,
+                        "description": "Resolvable DOI link (https://doi.org/{doi})",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "id": {
+                        "description": "Chunk/point ID",
+                        "type": "string"
+                    },
+                    "metadata": {
+                        "additionalProperties": true,
+                        "default": null,
+                        "description": "Document metadata (title, authors, journal, etc.). Null when includeMetadata is false.",
+                        "type": [
+                            "object",
+                            "null"
+                        ]
+                    },
+                    "relevance": {
+                        "$ref": "#/components/schemas/RelevanceInfo",
+                        "description": "Relevance verdict for this result"
+                    },
+                    "section": {
+                        "default": null,
+                        "description": "Comma-joined source section(s) of the article, from the normalized vocabulary (abstract, introduction, background, methods, results, discussion, conclusion, case, supplementary, other)",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "text": {
+                        "description": "Chunk text content",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "text",
+                    "relevance"
+                ],
+                "type": "object"
+            },
+            "ClarificationInfo": {
+                "properties": {
+                    "question": {
+                        "description": "The clarifying question to ask the user",
+                        "type": "string"
+                    },
+                    "reason": {
+                        "default": "",
+                        "description": "Why clarification is needed",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "question"
+                ],
+                "type": "object"
+            },
+            "CollectionsResponse": {
+                "properties": {
+                    "collections": {
+                        "description": "List of accessible collections.",
+                        "items": {
+                            "properties": {
+                                "documentCount": {
+                                    "description": "Number of documents in the collection.",
+                                    "type": "integer"
+                                },
+                                "name": {
+                                    "description": "Collection name.",
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "name",
+                                "documentCount"
+                            ],
+                            "type": "object"
+                        },
+                        "type": "array"
+                    },
+                    "count": {
+                        "description": "Total number of accessible collections.",
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "collections",
+                    "count"
+                ],
+                "type": "object"
+            },
+            "Error": {
+                "properties": {
+                    "error": {
+                        "properties": {
+                            "code": {
+                                "description": "Machine-readable error code.",
+                                "examples": [
+                                    "UNAUTHORIZED",
+                                    "FORBIDDEN",
+                                    "NOT_FOUND",
+                                    "VALIDATION_ERROR",
+                                    "RATE_LIMITED"
+                                ],
+                                "type": "string"
+                            },
+                            "message": {
+                                "description": "Human-readable error description.",
+                                "type": "string"
+                            },
+                            "requestId": {
+                                "description": "Request ID for debugging.",
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "code",
+                            "message"
+                        ],
+                        "type": "object"
+                    }
+                },
+                "required": [
+                    "error"
+                ],
+                "type": "object"
+            },
+            "FilterWarning": {
+                "properties": {
+                    "code": {
+                        "description": "Machine-readable code, e.g. `unindexed_filter_field`.",
+                        "type": "string"
+                    },
+                    "field": {
+                        "description": "The filter field the warning concerns.",
+                        "type": "string"
+                    },
+                    "message": {
+                        "description": "Human-readable explanation.",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "code",
+                    "field",
+                    "message"
+                ],
+                "type": "object"
+            },
+            "JournalMetricExpansion": {
+                "properties": {
+                    "condition": {
+                        "description": "Threshold applied, e.g. `gte 5.0`.",
+                        "type": "string"
+                    },
+                    "field": {
+                        "description": "Metric field expanded, e.g. `journal_metric.2yr_mean_citedness`.",
+                        "type": "string"
+                    },
+                    "issnCount": {
+                        "description": "ISSNs pushed down (a journal usually has both a print and an electronic ISSN).",
+                        "type": "integer"
+                    },
+                    "matchedJournals": {
+                        "description": "Distinct journals matching the threshold.",
+                        "type": "integer"
+                    },
+                    "sampleIssns": {
+                        "description": "First few ISSNs, for inspection.",
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    }
+                },
+                "required": [
+                    "field",
+                    "condition",
+                    "matchedJournals",
+                    "issnCount"
+                ],
+                "type": "object"
+            },
+            "QueryUnderstanding": {
+                "description": "How the endpoint read the query.",
+                "properties": {
+                    "aspects": {
+                        "description": "Facets asked about the entity (e.g. mechanism of action, dermal penetration, clinical outcomes)",
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    },
+                    "entities": {
+                        "description": "Entities the query is about (substances, genes, diseases, organisms, methods)",
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    },
+                    "filters": {
+                        "additionalProperties": true,
+                        "description": "Structured metadata constraints read off the query. Possible keys (snake_case, present only when the query named the constraint): 'journal' (str), 'publisher' (str), 'article_type' (str, JATS vocabulary), 'publication_date' ({'gte'?: 'YYYY-MM-DD', 'lt'?: 'YYYY-MM-DD'}). Empty object when the query named none.",
+                        "type": "object"
+                    },
+                    "intent": {
+                        "default": "",
+                        "description": "What the query is asking for",
+                        "type": "string"
+                    }
+                },
+                "required": [],
+                "type": "object"
+            },
+            "QuotaInfo": {
+                "properties": {
+                    "dailyLimit": {
+                        "description": "Max queries per day.",
+                        "type": "integer"
+                    },
+                    "dailyRemaining": {
+                        "description": "Queries remaining today.",
+                        "type": "integer"
+                    },
+                    "dailyUsed": {
+                        "description": "Queries used today.",
+                        "type": "integer"
+                    },
+                    "monthlyLimit": {
+                        "description": "Max queries per month.",
+                        "type": "integer"
+                    },
+                    "monthlyRemaining": {
+                        "description": "Queries remaining this month.",
+                        "type": "integer"
+                    },
+                    "monthlyUsed": {
+                        "description": "Queries used this month.",
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "dailyLimit",
+                    "dailyUsed",
+                    "dailyRemaining",
+                    "monthlyLimit",
+                    "monthlyUsed",
+                    "monthlyRemaining"
+                ],
+                "type": "object"
+            },
+            "RelevanceInfo": {
+                "description": "Why a result was judged relevant.",
+                "properties": {
+                    "judgeScore": {
+                        "description": "Relevance score assigned by the judge (0..1)",
+                        "type": "number"
+                    },
+                    "matchedTerms": {
+                        "description": "Entity/synonym surface forms found in the chunk (for highlighting)",
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    },
+                    "rationale": {
+                        "default": "",
+                        "description": "One-sentence explanation of relevance",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "judgeScore"
+                ],
+                "type": "object"
+            },
+            "SearchRequest": {
+                "description": "Provide exactly one of `collection` (single) or `collections` (multi-collection search).",
+                "properties": {
+                    "collection": {
+                        "default": null,
+                        "description": "Name of the collection to search. Mutually exclusive with `collections`.",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "collections": {
+                        "default": null,
+                        "description": "Collections to search together (max 5, unique). Each collection is searched with its own access entitlements and the results are merged into one relevance-ranked list; each result carries its origin `collection`. Mutually exclusive with `collection`.",
+                        "items": {
+                            "type": "string"
+                        },
+                        "maxItems": 5,
+                        "minItems": 1,
+                        "type": [
+                            "array",
+                            "null"
+                        ]
+                    },
+                    "filters": {
+                        "additionalProperties": true,
+                        "default": null,
+                        "description": "Optional metadata filter. Two accepted forms.\n\nFlat (top-level keys are ANDed): `{\"journal\": \"Nature\", \"publication_date\": {\"gte\": \"2020-01-01\"}}`.\n\nStructured DSL (for OR / nesting): `{\"and\": [{\"field\": \"journal\", \"eq\": \"Nature\"}]}`. Operators: `eq`, `ne`, `in`, `not_in`, `gt`, `gte`, `lt`, `lte`, `between`. Combinators: `and`, `or`, `not`.\n\nExclusion uses `ne` / `not_in` / `not` \u2014 there is no separate syntax: `{\"and\": [{\"field\": \"issn\", \"not_in\": [\"1234-5678\"]}]}`.\n\nIndexed on every collection (any other field is matched by scanning and returns a `filterWarnings` entry): `article_type`, `doc_id`, `doi`, `issn`, `journal`, `keywords`, `publication_date`, `publisher`, `section`.\n\nIndexed on the editorial collections only (People Inc): `medical_board_approved`, `topic`, `url`.\n\n`issn` accepts hyphenated or bare, upper- or lower-case X (`\"1664-302X\"`, `\"1664302x\"`). `doi` is matched case-insensitively and an optional `https://doi.org/` or `doi:` prefix is accepted.\n\n`journal_metric.2yr_mean_citedness`, `journal_metric.h_index` and `journal_metric.i10_index` accept range operators only and are resolved server-side into the matching ISSNs; see `journalMetricExpansions` in the response.",
+                        "type": [
+                            "object",
+                            "null"
+                        ]
+                    },
+                    "imageMaxHeight": {
+                        "default": 600,
+                        "description": "Maximum image height in pixels",
+                        "maximum": 1080,
+                        "minimum": 100,
+                        "type": "integer"
+                    },
+                    "imageMaxWidth": {
+                        "default": 800,
+                        "description": "Maximum image width in pixels",
+                        "maximum": 1920,
+                        "minimum": 100,
+                        "type": "integer"
+                    },
+                    "imageQuality": {
+                        "default": 75,
+                        "description": "JPEG quality for fetched images",
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer"
+                    },
+                    "includeFigures": {
+                        "default": false,
+                        "description": "Fetch and include figure images as base64 in metadata (adds latency). includeImages is accepted as a deprecated alias.",
+                        "type": "boolean"
+                    },
+                    "includeMetadata": {
+                        "default": true,
+                        "description": "Whether to include metadata in results",
+                        "type": "boolean"
+                    },
+                    "limit": {
+                        "default": 10,
+                        "description": "Maximum results to return (default 10, max 30)",
+                        "maximum": 30,
+                        "minimum": 1,
+                        "type": "integer"
+                    },
+                    "query": {
+                        "description": "Natural language or keyword search query.",
+                        "maxLength": 1000,
+                        "minLength": 1,
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "query"
+                ],
+                "type": "object"
+            },
+            "SearchResponse": {
+                "properties": {
+                    "filterWarnings": {
+                        "default": null,
+                        "description": "Advisory warnings about the supplied filter \u2014 for example filtering on a field with no payload index, which is matched by scanning. The search still runs. Omitted when there are none.",
+                        "items": {
+                            "$ref": "#/components/schemas/FilterWarning"
+                        },
+                        "type": [
+                            "array",
+                            "null"
+                        ]
+                    },
+                    "journalMetricExpansions": {
+                        "default": null,
+                        "description": "How each journal-metric condition resolved to ISSNs; omitted when no metric filter was used",
+                        "items": {
+                            "$ref": "#/components/schemas/JournalMetricExpansion"
+                        },
+                        "type": [
+                            "array",
+                            "null"
+                        ]
+                    },
+                    "latencyMs": {
+                        "description": "Search latency in milliseconds",
+                        "type": "integer"
+                    },
+                    "queryId": {
+                        "description": "Unique identifier for this query. Use it to re-fetch the same results for free within 7 days via GET /api/v1/search/results/{queryId}.",
+                        "type": "string"
+                    },
+                    "results": {
+                        "description": "Ranked list of matching document chunks.",
+                        "items": {
+                            "$ref": "#/components/schemas/SearchResult"
+                        },
+                        "type": "array"
+                    }
+                },
+                "required": [
+                    "results",
+                    "queryId",
+                    "latencyMs"
+                ],
+                "type": "object"
+            },
+            "SearchResult": {
+                "properties": {
+                    "collection": {
+                        "default": null,
+                        "description": "Origin collection of this result \u2014 the name as requested, so a logical collection reports the logical name rather than the physical one it resolves to. Always populated.",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "id": {
+                        "description": "Chunk/point ID",
+                        "type": "string"
+                    },
+                    "metadata": {
+                        "additionalProperties": true,
+                        "default": null,
+                        "description": "Document metadata (title, authors, journal, etc.). Null when includeMetadata is false.",
+                        "type": [
+                            "object",
+                            "null"
+                        ]
+                    },
+                    "text": {
+                        "description": "Chunk text content",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "text"
+                ],
+                "type": "object"
+            }
+        },
+        "securitySchemes": {
+            "BearerAuth": {
+                "description": "API key authentication. Pass your key in the Authorization header as `Bearer sk_live_...`. An `X-API-Key: sk_live_...` header is also accepted as an alternative. Keys are created in the Redpine Connect dashboard under Settings > API Keys.",
+                "scheme": "bearer",
+                "type": "http"
+            }
+        }
+    },
+    "info": {
+        "description": "Hybrid retrieval API for searching biomedical and scientific document collections. Combines dense vector search, sparse keyword matching, and cross-encoder reranking to deliver high-precision results.",
+        "title": "Redpine Connect Search API",
+        "version": "1.0.0"
+    },
+    "openapi": "3.1.0",
+    "paths": {
+        "/api/v1/search/assisted": {
+            "post": {
+                "description": "Agentic search: the query is interpreted, one or more internal searches are planned and run, every candidate is verified as actually addressing the query, and only verified results are returned.\n\n**Billing differs from `/search/query`:** only delivered, verified results are charged. A clarification request or an honest no-results answer costs nothing. Internal search fan-out and LLM tokens are absorbed by Redpine.\n\nAccepts the same `filters` as `/search/query`, applied to every internal search.",
+                "operationId": "searchAssisted",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AssistedSearchRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AssistedSearchResponse"
+                                }
+                            }
+                        },
+                        "description": "Verified results, a clarification request, or an explicit no-relevant-results outcome",
+                        "headers": {
+                            "X-Billing-Mode": {
+                                "description": "How this query was billed. `live`: charged normally. `exempt`: the org is billing-exempt (no charge). `trial`: covered by trial credit. Never sent for `kill_switch` (billing disabled org-wide) \u2014 the billing headers are omitted entirely in that case.",
+                                "schema": {
+                                    "enum": [
+                                        "live",
+                                        "exempt",
+                                        "trial"
+                                    ],
+                                    "type": "string"
+                                }
+                            },
+                            "X-Credits-Remaining": {
+                                "description": "The org's remaining credit balance after this query. Omitted when the API key has its balance hidden.",
+                                "schema": {
+                                    "type": "string"
+                                }
+                            },
+                            "X-Query-Cost": {
+                                "description": "Cost charged for this query, in credits (6 decimal places).",
+                                "schema": {
+                                    "type": "string"
+                                }
+                            },
+                            "X-RateLimit-Limit": {
+                                "description": "The org's daily query limit.",
+                                "schema": {
+                                    "type": "integer"
+                                }
+                            },
+                            "X-RateLimit-Remaining": {
+                                "description": "Queries remaining today.",
+                                "schema": {
+                                    "type": "integer"
+                                }
+                            },
+                            "X-RateLimit-Reset": {
+                                "description": "Unix timestamp (seconds) when the daily limit resets.",
+                                "schema": {
+                                    "type": "integer"
+                                }
+                            },
+                            "X-Tokens-Used": {
+                                "description": "Tokens billed for this query.",
+                                "schema": {
+                                    "type": "integer"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "description": "Missing or invalid API key"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "description": "API key does not have access to the requested collection"
+                    },
+                    "422": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "description": "Validation error (e.g. query too long, invalid filter)"
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "description": "Rate or quota limit exceeded"
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "description": "Assisted search temporarily unavailable"
+                    }
+                },
+                "summary": "Assisted search (verified results only)",
+                "tags": [
+                    "search"
+                ]
+            }
+        },
+        "/api/v1/search/collections": {
+            "get": {
+                "description": "List all document collections accessible to the authenticated API key.",
+                "operationId": "listCollections",
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CollectionsResponse"
+                                }
+                            }
+                        },
+                        "description": "List of accessible collections"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "description": "Missing or invalid API key"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "description": "Forbidden"
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "description": "Rate limit exceeded"
+                    }
+                },
+                "summary": "List collections",
+                "tags": [
+                    "search"
+                ]
+            }
+        },
+        "/api/v1/search/query": {
+            "post": {
+                "description": "Search one or more collections using natural language or keyword queries. Results are ranked by relevance using hybrid retrieval (dense + sparse + reranking). Pass `collections` (up to 5) to search several collections in one call and receive a single merged, relevance-ranked list with per-result origin labels.",
+                "operationId": "searchQuery",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SearchRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SearchResponse"
+                                }
+                            }
+                        },
+                        "description": "Search results",
+                        "headers": {
+                            "X-Billing-Mode": {
+                                "description": "How this query was billed. `live`: charged normally. `exempt`: the org is billing-exempt (no charge). `trial`: covered by trial credit. Never sent for `kill_switch` (billing disabled org-wide) \u2014 the billing headers are omitted entirely in that case.",
+                                "schema": {
+                                    "enum": [
+                                        "live",
+                                        "exempt",
+                                        "trial"
+                                    ],
+                                    "type": "string"
+                                }
+                            },
+                            "X-Cache-Expires": {
+                                "description": "ISO timestamp until which these results can be re-fetched for free via GET /api/v1/search/results/{queryId}.",
+                                "schema": {
+                                    "format": "date-time",
+                                    "type": "string"
+                                }
+                            },
+                            "X-Credits-Remaining": {
+                                "description": "The org's remaining credit balance after this query. Omitted when the API key has its balance hidden.",
+                                "schema": {
+                                    "type": "string"
+                                }
+                            },
+                            "X-Query-Cost": {
+                                "description": "Cost charged for this query, in credits (6 decimal places).",
+                                "schema": {
+                                    "type": "string"
+                                }
+                            },
+                            "X-RateLimit-Limit": {
+                                "description": "The org's daily query limit.",
+                                "schema": {
+                                    "type": "integer"
+                                }
+                            },
+                            "X-RateLimit-Remaining": {
+                                "description": "Queries remaining today.",
+                                "schema": {
+                                    "type": "integer"
+                                }
+                            },
+                            "X-RateLimit-Reset": {
+                                "description": "Unix timestamp (seconds) when the daily limit resets.",
+                                "schema": {
+                                    "type": "integer"
+                                }
+                            },
+                            "X-Tokens-Used": {
+                                "description": "Tokens billed for this query.",
+                                "schema": {
+                                    "type": "integer"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "description": "Missing or invalid API key"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "description": "API key does not have access to the requested collection"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "description": "Collection not found"
+                    },
+                    "422": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "description": "Validation error (e.g. query too long)"
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "description": "Rate or quota limit exceeded"
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "description": "Search temporarily unavailable (Qdrant or the quota service is down)"
+                    }
+                },
+                "summary": "Search documents",
+                "tags": [
+                    "search"
+                ]
+            }
+        },
+        "/api/v1/search/quota": {
+            "get": {
+                "description": "Daily and monthly query usage and limits for the authenticated organization.",
+                "operationId": "getQuota",
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/QuotaInfo"
+                                }
+                            }
+                        },
+                        "description": "Current quota usage"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "description": "Missing or invalid API key"
+                    }
+                },
+                "summary": "Current quota usage and limits",
+                "tags": [
+                    "search"
+                ]
+            }
+        },
+        "/api/v1/search/results/{queryId}": {
+            "get": {
+                "description": "Retrieve previously returned search results using the queryId from a prior search response. Returns the same results without billing. The request must use the same API key that performed the original search. Results are available for 7 days.",
+                "operationId": "getCachedResult",
+                "parameters": [
+                    {
+                        "description": "The queryId from a previous search response.",
+                        "in": "path",
+                        "name": "queryId",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SearchResponse"
+                                }
+                            }
+                        },
+                        "description": "Cached search results (identical to original response, with latencyMs: 0)",
+                        "headers": {
+                            "X-Cache": {
+                                "description": "Indicates this is a cached response.",
+                                "schema": {
+                                    "example": "hit",
+                                    "type": "string"
+                                }
+                            },
+                            "X-Cache-Expires": {
+                                "description": "ISO timestamp when the cached result expires.",
+                                "schema": {
+                                    "format": "date-time",
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "description": "Missing or invalid API key"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "description": "Query ID not found or belongs to a different API key"
+                    },
+                    "410": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "description": "Cached result has expired (past 7-day window)"
+                    }
+                },
+                "summary": "Re-fetch cached results",
+                "tags": [
+                    "search"
+                ]
+            }
+        },
+        "/api/v1/search/{collection}": {
+            "post": {
+                "description": "Shorthand for POST /api/v1/search/query with the collection named in the path instead of the body. Same pipeline, same response shape, one collection per call \u2014 use /query's `collections` form to search several at once.",
+                "operationId": "searchCollection",
+                "parameters": [
+                    {
+                        "description": "Name of the collection to search.",
+                        "in": "path",
+                        "name": "collection",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "additionalProperties": false,
+                                "description": "Same knobs as SearchRequest minus `collection`/`collections` \u2014 the target collection is the path segment, so a `collection` key in the body is rejected.",
+                                "properties": {
+                                    "filters": {
+                                        "additionalProperties": true,
+                                        "default": null,
+                                        "description": "Optional metadata filter. Two accepted forms.\n\nFlat (top-level keys are ANDed): `{\"journal\": \"Nature\", \"publication_date\": {\"gte\": \"2020-01-01\"}}`.\n\nStructured DSL (for OR / nesting): `{\"and\": [{\"field\": \"journal\", \"eq\": \"Nature\"}]}`. Operators: `eq`, `ne`, `in`, `not_in`, `gt`, `gte`, `lt`, `lte`, `between`. Combinators: `and`, `or`, `not`.\n\nExclusion uses `ne` / `not_in` / `not` \u2014 there is no separate syntax: `{\"and\": [{\"field\": \"issn\", \"not_in\": [\"1234-5678\"]}]}`.\n\nIndexed on every collection (any other field is matched by scanning and returns a `filterWarnings` entry): `article_type`, `doc_id`, `doi`, `issn`, `journal`, `keywords`, `publication_date`, `publisher`, `section`.\n\nIndexed on the editorial collections only (People Inc): `medical_board_approved`, `topic`, `url`.\n\n`issn` accepts hyphenated or bare, upper- or lower-case X (`\"1664-302X\"`, `\"1664302x\"`). `doi` is matched case-insensitively and an optional `https://doi.org/` or `doi:` prefix is accepted.\n\n`journal_metric.2yr_mean_citedness`, `journal_metric.h_index` and `journal_metric.i10_index` accept range operators only and are resolved server-side into the matching ISSNs; see `journalMetricExpansions` in the response.",
+                                        "type": [
+                                            "object",
+                                            "null"
+                                        ]
+                                    },
+                                    "imageMaxHeight": {
+                                        "default": 600,
+                                        "description": "Maximum image height in pixels",
+                                        "maximum": 1080,
+                                        "minimum": 100,
+                                        "type": "integer"
+                                    },
+                                    "imageMaxWidth": {
+                                        "default": 800,
+                                        "description": "Maximum image width in pixels",
+                                        "maximum": 1920,
+                                        "minimum": 100,
+                                        "type": "integer"
+                                    },
+                                    "imageQuality": {
+                                        "default": 75,
+                                        "description": "JPEG quality for fetched images",
+                                        "maximum": 100,
+                                        "minimum": 1,
+                                        "type": "integer"
+                                    },
+                                    "includeFigures": {
+                                        "default": false,
+                                        "description": "Fetch and include figure images as base64 in metadata (adds latency). includeImages is accepted as a deprecated alias.",
+                                        "type": "boolean"
+                                    },
+                                    "includeMetadata": {
+                                        "default": true,
+                                        "description": "Whether to include metadata in results",
+                                        "type": "boolean"
+                                    },
+                                    "limit": {
+                                        "default": 10,
+                                        "description": "Maximum results to return (default 10, max 30)",
+                                        "maximum": 30,
+                                        "minimum": 1,
+                                        "type": "integer"
+                                    },
+                                    "query": {
+                                        "description": "Natural language or keyword search query.",
+                                        "maxLength": 1000,
+                                        "minLength": 1,
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "query"
+                                ],
+                                "type": "object"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SearchResponse"
+                                }
+                            }
+                        },
+                        "description": "Search results",
+                        "headers": {
+                            "X-Billing-Mode": {
+                                "description": "How this query was billed. `live`: charged normally. `exempt`: the org is billing-exempt (no charge). `trial`: covered by trial credit. Never sent for `kill_switch` (billing disabled org-wide) \u2014 the billing headers are omitted entirely in that case.",
+                                "schema": {
+                                    "enum": [
+                                        "live",
+                                        "exempt",
+                                        "trial"
+                                    ],
+                                    "type": "string"
+                                }
+                            },
+                            "X-Cache-Expires": {
+                                "description": "ISO timestamp until which these results can be re-fetched for free via GET /api/v1/search/results/{queryId}.",
+                                "schema": {
+                                    "format": "date-time",
+                                    "type": "string"
+                                }
+                            },
+                            "X-Credits-Remaining": {
+                                "description": "The org's remaining credit balance after this query. Omitted when the API key has its balance hidden.",
+                                "schema": {
+                                    "type": "string"
+                                }
+                            },
+                            "X-Query-Cost": {
+                                "description": "Cost charged for this query, in credits (6 decimal places).",
+                                "schema": {
+                                    "type": "string"
+                                }
+                            },
+                            "X-RateLimit-Limit": {
+                                "description": "The org's daily query limit.",
+                                "schema": {
+                                    "type": "integer"
+                                }
+                            },
+                            "X-RateLimit-Remaining": {
+                                "description": "Queries remaining today.",
+                                "schema": {
+                                    "type": "integer"
+                                }
+                            },
+                            "X-RateLimit-Reset": {
+                                "description": "Unix timestamp (seconds) when the daily limit resets.",
+                                "schema": {
+                                    "type": "integer"
+                                }
+                            },
+                            "X-Tokens-Used": {
+                                "description": "Tokens billed for this query.",
+                                "schema": {
+                                    "type": "integer"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "description": "Missing or invalid API key"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "description": "API key does not have access to the requested collection"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "description": "Collection not found"
+                    },
+                    "422": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "description": "Validation error (e.g. a `collection` key in the body)"
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "description": "Rate or quota limit exceeded"
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "description": "Search temporarily unavailable (Qdrant or the quota service is down)"
+                    }
+                },
+                "summary": "Search a single collection by name",
+                "tags": [
+                    "search"
+                ]
+            }
+        }
+    },
+    "security": [
+        {
+            "BearerAuth": []
+        }
+    ],
+    "servers": [
+        {
+            "description": "Production",
+            "url": "https://api.redpine.ai"
+        }
+    ]
+}

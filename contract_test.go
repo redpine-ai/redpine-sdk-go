@@ -75,7 +75,11 @@ var errTypes = map[string]func(error) bool{
 }
 
 func TestContractFixtures(t *testing.T) {
+	// monorepo: go -> ../spec; public repo: module root -> ./spec
 	files, _ := filepath.Glob(filepath.Join("..", "spec", "fixtures", "*.json"))
+	if len(files) == 0 {
+		files, _ = filepath.Glob(filepath.Join("spec", "fixtures", "*.json"))
+	}
 	sort.Strings(files)
 	if len(files) == 0 {
 		t.Fatal("no fixtures found")

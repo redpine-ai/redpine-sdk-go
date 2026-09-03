@@ -1,0 +1,8 @@
+{
+  "op": "quota",
+  "args": {},
+  "request": {"method": "GET", "path": "/api/v1/search/quota", "body": null},
+  "response": {"status": 429, "headers": {"Retry-After": "7"},
+               "body": {"error": {"code": "RATE_LIMITED", "message": "slow down", "requestId": "r-429"}}},
+  "expect": {"error": "QuotaExceeded", "retry_after": 7, "field": null, "value": null}
+}

@@ -1,0 +1,7 @@
+{
+  "op": "get_results",
+  "args": {"query_id": "q-1"},
+  "request": {"method": "GET", "path": "/api/v1/search/results/q-1", "body": null},
+  "response": {"status": 200, "headers": {}, "body": {"results": [], "queryId": "q-1", "latencyMs": 0}},
+  "expect": {"error": null, "field": "queryId", "value": "q-1"}
+}

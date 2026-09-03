@@ -1,0 +1,8 @@
+{
+  "op": "collections",
+  "args": {},
+  "request": {"method": "GET", "path": "/api/v1/search/collections", "body": null},
+  "response": {"status": 200, "headers": {},
+               "body": {"collections": [{"name": "corpus", "documentCount": 3}], "count": 1}},
+  "expect": {"error": null, "field": "count", "value": 1}
+}
