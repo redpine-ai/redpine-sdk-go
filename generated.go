@@ -213,6 +213,51 @@ type JournalMetricExpansion struct {
 	SampleIssns *[]string `json:"sampleIssns,omitempty"`
 }
 
+// PreviewResult defines model for PreviewResult.
+type PreviewResult struct {
+	// Collection Origin collection of this result — the name as requested, so a logical collection reports the logical name rather than the physical one it resolves to. Always populated.
+	Collection *string `json:"collection,omitempty"`
+
+	// Cost Cost to unlock this one result.
+	Cost *string `json:"cost,omitempty"`
+
+	// Id Chunk/point ID
+	Id string `json:"id"`
+
+	// Locked True when text is a teaser rather than the full chunk
+	Locked bool `json:"locked"`
+
+	// Metadata Document metadata (title, authors, journal, etc.). Always present on /search/preview and /search/unlock, which take no includeMetadata option. On /search/results it is null when the original search set includeMetadata to false.
+	Metadata *map[string]interface{} `json:"metadata,omitempty"`
+
+	// Text Full chunk text when `locked` is false. A short teaser snippet — never the full chunk — when `locked` is true.
+	Text string `json:"text"`
+
+	// Tokens Billable tokens to unlock this result.
+	Tokens *int `json:"tokens,omitempty"`
+}
+
+// PreviewUnlockResponse defines model for PreviewUnlockResponse.
+type PreviewUnlockResponse struct {
+	// CostCharged What THIS call charged — not a running total. Null on a preview (always free) and on an unlock whose entire delta was already unlocked.
+	CostCharged *string `json:"costCharged,omitempty"`
+
+	// CostToUnlockRemaining Cost to unlock every result not yet unlocked. An estimate, not a binding quote: it is summed from each result's own individually-rounded cost, while the amount actually charged on the next unlock is computed per collection at that call's combined token total — the two can differ by a rounding fraction.
+	CostToUnlockRemaining string `json:"costToUnlockRemaining"`
+
+	// FilterWarnings Advisory warnings about the supplied filter — for example filtering on a field with no payload index, which is matched by scanning. The search still runs. Omitted when there are none.
+	FilterWarnings *[]FilterWarning `json:"filterWarnings,omitempty"`
+
+	// JournalMetricExpansions What each journal-metric threshold (e.g. impactFactor >= 5) expanded to. Omitted when no metric filter was used.
+	JournalMetricExpansions *[]JournalMetricExpansion `json:"journalMetricExpansions,omitempty"`
+
+	// QueryId Pass this to POST /search/unlock.
+	QueryId string `json:"queryId"`
+
+	// Results Every result from the query, filtered through the unlock ledger.
+	Results []PreviewResult `json:"results"`
+}
+
 // QueryUnderstanding How the endpoint read the query.
 type QueryUnderstanding struct {
 	// Aspects Facets asked about the entity (e.g. mechanism of action, dermal penetration, clinical outcomes)
@@ -261,6 +306,38 @@ type RelevanceInfo struct {
 	Rationale *string `json:"rationale,omitempty"`
 }
 
+// SearchPreviewRequest The result-selection half of SearchRequest. A preview quotes results rather than delivering them, so it takes no content-delivery options: figures are never fetched (they are not priced into the quote) and metadata is always returned. Provide exactly one of `collection` (single) or `collections` (multi).
+type SearchPreviewRequest struct {
+	// Collection Name of the collection to search. Mutually exclusive with `collections`.
+	Collection *string `json:"collection,omitempty"`
+
+	// Collections Collections to search together (max 5, unique). Each collection is searched with its own access entitlements and the results are merged into one relevance-ranked list; each result carries its origin `collection`. Mutually exclusive with `collection`.
+	Collections *[]string `json:"collections,omitempty"`
+
+	// Filters Optional metadata filter. Two accepted forms.
+	//
+	// Flat (top-level keys are ANDed): `{"journal": "Nature", "publication_date": {"gte": "2020-01-01"}}`.
+	//
+	// Structured DSL (for OR / nesting): `{"and": [{"field": "journal", "eq": "Nature"}]}`. Operators: `eq`, `ne`, `in`, `not_in`, `gt`, `gte`, `lt`, `lte`, `between`. Combinators: `and`, `or`, `not`.
+	//
+	// Exclusion uses `ne` / `not_in` / `not` — there is no separate syntax: `{"and": [{"field": "issn", "not_in": ["1234-5678"]}]}`.
+	//
+	// Indexed on every collection (any other field is matched by scanning and returns a `filterWarnings` entry): `article_type`, `chapter_authors`, `chapter_number`, `chapter_title`, `doc_id`, `doi`, `isbn`, `issn`, `journal`, `keywords`, `license`, `open_access`, `publication_date`, `publisher`, `section`.
+	//
+	// Indexed on the editorial collections only (People Inc): `last_updated_date`, `medical_board_approved`, `topic`, `url`.
+	//
+	// `issn` accepts hyphenated or bare, upper- or lower-case X (`"1664-302X"`, `"1664302x"`). `doi` is matched case-insensitively and an optional `https://doi.org/` or `doi:` prefix is accepted.
+	//
+	// `journal_metric.2yr_mean_citedness`, `journal_metric.h_index` and `journal_metric.i10_index` accept range operators only and are resolved server-side into the matching ISSNs; see `journalMetricExpansions` in the response.
+	Filters *map[string]interface{} `json:"filters,omitempty"`
+
+	// Limit Maximum results to return (default 10, max 30)
+	Limit *int `json:"limit,omitempty"`
+
+	// Query Natural language or keyword search query.
+	Query string `json:"query"`
+}
+
 // SearchRequest Provide exactly one of `collection` (single) or `collections` (multi-collection search).
 type SearchRequest struct {
 	// Collection Name of the collection to search. Mutually exclusive with `collections`.
@@ -277,9 +354,9 @@ type SearchRequest struct {
 	//
 	// Exclusion uses `ne` / `not_in` / `not` — there is no separate syntax: `{"and": [{"field": "issn", "not_in": ["1234-5678"]}]}`.
 	//
-	// Indexed on every collection (any other field is matched by scanning and returns a `filterWarnings` entry): `article_type`, `doc_id`, `doi`, `issn`, `journal`, `keywords`, `publication_date`, `publisher`, `section`.
+	// Indexed on every collection (any other field is matched by scanning and returns a `filterWarnings` entry): `article_type`, `chapter_authors`, `chapter_number`, `chapter_title`, `doc_id`, `doi`, `isbn`, `issn`, `journal`, `keywords`, `license`, `open_access`, `publication_date`, `publisher`, `section`.
 	//
-	// Indexed on the editorial collections only (People Inc): `medical_board_approved`, `topic`, `url`.
+	// Indexed on the editorial collections only (People Inc): `last_updated_date`, `medical_board_approved`, `topic`, `url`.
 	//
 	// `issn` accepts hyphenated or bare, upper- or lower-case X (`"1664-302X"`, `"1664302x"`). `doi` is matched case-insensitively and an optional `https://doi.org/` or `doi:` prefix is accepted.
 	//
@@ -341,6 +418,33 @@ type SearchResult struct {
 	Text string `json:"text"`
 }
 
+// SearchResultsPreviewResponse defines model for SearchResultsPreviewResponse.
+type SearchResultsPreviewResponse struct {
+	// FilterWarnings Advisory warnings about the supplied filter — for example filtering on a field with no payload index, which is matched by scanning. The search still runs. Omitted when there are none.
+	FilterWarnings *[]FilterWarning `json:"filterWarnings,omitempty"`
+
+	// JournalMetricExpansions How each journal-metric condition resolved to ISSNs; omitted when no metric filter was used
+	JournalMetricExpansions *[]JournalMetricExpansion `json:"journalMetricExpansions,omitempty"`
+
+	// LatencyMs Search latency in milliseconds
+	LatencyMs int `json:"latencyMs"`
+
+	// QueryId Unique identifier for this query, matching the original search response.
+	QueryId string `json:"queryId"`
+
+	// Results Every result from the original search, filtered through the unlock ledger.
+	Results []PreviewResult `json:"results"`
+}
+
+// UnlockRequest defines model for UnlockRequest.
+type UnlockRequest struct {
+	// QueryId The `queryId` from a previous POST /search/preview response.
+	QueryId string `json:"queryId"`
+
+	// ResultIds Result ids to unlock. Omit (or pass `null`) to unlock every result from the preview. Re-sending an id that is already unlocked costs nothing — only the delta is charged.
+	ResultIds *[]string `json:"resultIds,omitempty"`
+}
+
 // SearchCollectionJSONBody defines parameters for SearchCollection.
 type SearchCollectionJSONBody struct {
 	// Filters Optional metadata filter. Two accepted forms.
@@ -351,9 +455,9 @@ type SearchCollectionJSONBody struct {
 	//
 	// Exclusion uses `ne` / `not_in` / `not` — there is no separate syntax: `{"and": [{"field": "issn", "not_in": ["1234-5678"]}]}`.
 	//
-	// Indexed on every collection (any other field is matched by scanning and returns a `filterWarnings` entry): `article_type`, `doc_id`, `doi`, `issn`, `journal`, `keywords`, `publication_date`, `publisher`, `section`.
+	// Indexed on every collection (any other field is matched by scanning and returns a `filterWarnings` entry): `article_type`, `chapter_authors`, `chapter_number`, `chapter_title`, `doc_id`, `doi`, `isbn`, `issn`, `journal`, `keywords`, `license`, `open_access`, `publication_date`, `publisher`, `section`.
 	//
-	// Indexed on the editorial collections only (People Inc): `medical_board_approved`, `topic`, `url`.
+	// Indexed on the editorial collections only (People Inc): `last_updated_date`, `medical_board_approved`, `topic`, `url`.
 	//
 	// `issn` accepts hyphenated or bare, upper- or lower-case X (`"1664-302X"`, `"1664302x"`). `doi` is matched case-insensitively and an optional `https://doi.org/` or `doi:` prefix is accepted.
 	//
@@ -385,8 +489,14 @@ type SearchCollectionJSONBody struct {
 // SearchAssistedJSONRequestBody defines body for SearchAssisted for application/json ContentType.
 type SearchAssistedJSONRequestBody = AssistedSearchRequest
 
+// SearchPreviewJSONRequestBody defines body for SearchPreview for application/json ContentType.
+type SearchPreviewJSONRequestBody = SearchPreviewRequest
+
 // SearchQueryJSONRequestBody defines body for SearchQuery for application/json ContentType.
 type SearchQueryJSONRequestBody = SearchRequest
+
+// SearchUnlockJSONRequestBody defines body for SearchUnlock for application/json ContentType.
+type SearchUnlockJSONRequestBody = UnlockRequest
 
 // SearchCollectionJSONRequestBody defines body for SearchCollection for application/json ContentType.
 type SearchCollectionJSONRequestBody SearchCollectionJSONBody
@@ -498,6 +608,28 @@ type ClientInterface interface {
 	// Corresponds with GET /api/v1/search/collections (the `ListCollections` operationId).
 	ListCollections(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// SearchPreviewWithBody Preview search results without charging
+	//
+	// Run the same pipeline as POST /api/v1/search/query -- same entitlement checks, same retraction filtering, same relevance ranking -- but never charge for it. Every result comes back locked, with a teaser snippet in `text` and the cost to unlock it. Works even at a zero balance. Consumes no credits, no trial query and no quota.
+	//
+	// Call POST /api/v1/search/unlock with the returned `queryId` to pay for and receive some or all of the results in full.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/search/preview (the `SearchPreview` operationId).
+	SearchPreviewWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SearchPreview Preview search results without charging
+	//
+	// Run the same pipeline as POST /api/v1/search/query -- same entitlement checks, same retraction filtering, same relevance ranking -- but never charge for it. Every result comes back locked, with a teaser snippet in `text` and the cost to unlock it. Works even at a zero balance. Consumes no credits, no trial query and no quota.
+	//
+	// Call POST /api/v1/search/unlock with the returned `queryId` to pay for and receive some or all of the results in full.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/search/preview (the `SearchPreview` operationId).
+	SearchPreview(ctx context.Context, body SearchPreviewJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// SearchQueryWithBody Search documents
 	//
 	// Search one or more collections using natural language or keyword queries. Results are ranked by relevance using hybrid retrieval (dense + sparse + reranking). Pass `collections` (up to 5) to search several collections in one call and receive a single merged, relevance-ranked list with per-result origin labels.
@@ -527,8 +659,28 @@ type ClientInterface interface {
 	//
 	// Retrieve previously returned search results using the queryId from a prior search response. Returns the same results without billing. The request must use the same API key that performed the original search. Results are available for 7 days.
 	//
+	// Each result carries `locked`/`tokens`/`cost`: a result not yet paid for through POST /api/v1/search/unlock comes back as a teaser (`locked: true`), never the full text.
+	//
 	// Corresponds with GET /api/v1/search/results/{queryId} (the `GetCachedResult` operationId).
 	GetCachedResult(ctx context.Context, queryId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SearchUnlockWithBody Pay for previewed results and receive them in full
+	//
+	// Charges only for results not already unlocked by an earlier call against the same `queryId` -- re-sending the same ids costs nothing. Omit `resultIds` (or pass `null`) to unlock everything from the preview.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/search/unlock (the `SearchUnlock` operationId).
+	SearchUnlockWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SearchUnlock Pay for previewed results and receive them in full
+	//
+	// Charges only for results not already unlocked by an earlier call against the same `queryId` -- re-sending the same ids costs nothing. Omit `resultIds` (or pass `null`) to unlock everything from the preview.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/search/unlock (the `SearchUnlock` operationId).
+	SearchUnlock(ctx context.Context, body SearchUnlockJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SearchCollectionWithBody Search a single collection by name
 	//
@@ -612,6 +764,48 @@ func (c *Client) ListCollections(ctx context.Context, reqEditors ...RequestEdito
 	return c.Client.Do(req)
 }
 
+// SearchPreviewWithBody Preview search results without charging
+//
+// Run the same pipeline as POST /api/v1/search/query -- same entitlement checks, same retraction filtering, same relevance ranking -- but never charge for it. Every result comes back locked, with a teaser snippet in `text` and the cost to unlock it. Works even at a zero balance. Consumes no credits, no trial query and no quota.
+//
+// Call POST /api/v1/search/unlock with the returned `queryId` to pay for and receive some or all of the results in full.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/search/preview (the `SearchPreview` operationId).
+func (c *Client) SearchPreviewWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSearchPreviewRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SearchPreview Preview search results without charging
+//
+// Run the same pipeline as POST /api/v1/search/query -- same entitlement checks, same retraction filtering, same relevance ranking -- but never charge for it. Every result comes back locked, with a teaser snippet in `text` and the cost to unlock it. Works even at a zero balance. Consumes no credits, no trial query and no quota.
+//
+// Call POST /api/v1/search/unlock with the returned `queryId` to pay for and receive some or all of the results in full.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/search/preview (the `SearchPreview` operationId).
+func (c *Client) SearchPreview(ctx context.Context, body SearchPreviewJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSearchPreviewRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // SearchQueryWithBody Search documents
 //
 // Search one or more collections using natural language or keyword queries. Results are ranked by relevance using hybrid retrieval (dense + sparse + reranking). Pass `collections` (up to 5) to search several collections in one call and receive a single merged, relevance-ranked list with per-result origin labels.
@@ -671,9 +865,49 @@ func (c *Client) GetQuota(ctx context.Context, reqEditors ...RequestEditorFn) (*
 //
 // Retrieve previously returned search results using the queryId from a prior search response. Returns the same results without billing. The request must use the same API key that performed the original search. Results are available for 7 days.
 //
+// Each result carries `locked`/`tokens`/`cost`: a result not yet paid for through POST /api/v1/search/unlock comes back as a teaser (`locked: true`), never the full text.
+//
 // Corresponds with GET /api/v1/search/results/{queryId} (the `GetCachedResult` operationId).
 func (c *Client) GetCachedResult(ctx context.Context, queryId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetCachedResultRequest(c.Server, queryId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SearchUnlockWithBody Pay for previewed results and receive them in full
+//
+// Charges only for results not already unlocked by an earlier call against the same `queryId` -- re-sending the same ids costs nothing. Omit `resultIds` (or pass `null`) to unlock everything from the preview.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/search/unlock (the `SearchUnlock` operationId).
+func (c *Client) SearchUnlockWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSearchUnlockRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SearchUnlock Pay for previewed results and receive them in full
+//
+// Charges only for results not already unlocked by an earlier call against the same `queryId` -- re-sending the same ids costs nothing. Omit `resultIds` (or pass `null`) to unlock everything from the preview.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/search/unlock (the `SearchUnlock` operationId).
+func (c *Client) SearchUnlock(ctx context.Context, body SearchUnlockJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSearchUnlockRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -789,6 +1023,46 @@ func NewListCollectionsRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
+// NewSearchPreviewRequest calls the generic SearchPreview builder with application/json body
+func NewSearchPreviewRequest(server string, body SearchPreviewJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSearchPreviewRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewSearchPreviewRequestWithBody constructs an http.Request for the SearchPreview method, with any body, and a specified content type
+func NewSearchPreviewRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/search/preview")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewSearchQueryRequest calls the generic SearchQuery builder with application/json body
 func NewSearchQueryRequest(server string, body SearchQueryJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -886,6 +1160,46 @@ func NewGetCachedResultRequest(server string, queryId string) (*http.Request, er
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewSearchUnlockRequest calls the generic SearchUnlock builder with application/json body
+func NewSearchUnlockRequest(server string, body SearchUnlockJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSearchUnlockRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewSearchUnlockRequestWithBody constructs an http.Request for the SearchUnlock method, with any body, and a specified content type
+func NewSearchUnlockRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/search/unlock")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -1016,6 +1330,28 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /api/v1/search/collections (the `ListCollections` operationId).
 	ListCollectionsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListCollectionsResponse, error)
 
+	// SearchPreviewWithBodyWithResponse Preview search results without charging
+	//
+	// Run the same pipeline as POST /api/v1/search/query -- same entitlement checks, same retraction filtering, same relevance ranking -- but never charge for it. Every result comes back locked, with a teaser snippet in `text` and the cost to unlock it. Works even at a zero balance. Consumes no credits, no trial query and no quota.
+	//
+	// Call POST /api/v1/search/unlock with the returned `queryId` to pay for and receive some or all of the results in full.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/search/preview (the `SearchPreview` operationId).
+	SearchPreviewWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SearchPreviewResponse, error)
+
+	// SearchPreviewWithResponse Preview search results without charging
+	//
+	// Run the same pipeline as POST /api/v1/search/query -- same entitlement checks, same retraction filtering, same relevance ranking -- but never charge for it. Every result comes back locked, with a teaser snippet in `text` and the cost to unlock it. Works even at a zero balance. Consumes no credits, no trial query and no quota.
+	//
+	// Call POST /api/v1/search/unlock with the returned `queryId` to pay for and receive some or all of the results in full.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/search/preview (the `SearchPreview` operationId).
+	SearchPreviewWithResponse(ctx context.Context, body SearchPreviewJSONRequestBody, reqEditors ...RequestEditorFn) (*SearchPreviewResponse, error)
+
 	// SearchQueryWithBodyWithResponse Search documents
 	//
 	// Search one or more collections using natural language or keyword queries. Results are ranked by relevance using hybrid retrieval (dense + sparse + reranking). Pass `collections` (up to 5) to search several collections in one call and receive a single merged, relevance-ranked list with per-result origin labels.
@@ -1047,10 +1383,30 @@ type ClientWithResponsesInterface interface {
 	//
 	// Retrieve previously returned search results using the queryId from a prior search response. Returns the same results without billing. The request must use the same API key that performed the original search. Results are available for 7 days.
 	//
+	// Each result carries `locked`/`tokens`/`cost`: a result not yet paid for through POST /api/v1/search/unlock comes back as a teaser (`locked: true`), never the full text.
+	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /api/v1/search/results/{queryId} (the `GetCachedResult` operationId).
 	GetCachedResultWithResponse(ctx context.Context, queryId string, reqEditors ...RequestEditorFn) (*GetCachedResultResponse, error)
+
+	// SearchUnlockWithBodyWithResponse Pay for previewed results and receive them in full
+	//
+	// Charges only for results not already unlocked by an earlier call against the same `queryId` -- re-sending the same ids costs nothing. Omit `resultIds` (or pass `null`) to unlock everything from the preview.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/search/unlock (the `SearchUnlock` operationId).
+	SearchUnlockWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SearchUnlockResponse, error)
+
+	// SearchUnlockWithResponse Pay for previewed results and receive them in full
+	//
+	// Charges only for results not already unlocked by an earlier call against the same `queryId` -- re-sending the same ids costs nothing. Omit `resultIds` (or pass `null`) to unlock everything from the preview.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/search/unlock (the `SearchUnlock` operationId).
+	SearchUnlockWithResponse(ctx context.Context, body SearchUnlockJSONRequestBody, reqEditors ...RequestEditorFn) (*SearchUnlockResponse, error)
 
 	// SearchCollectionWithBodyWithResponse Search a single collection by name
 	//
@@ -1222,6 +1578,89 @@ func (r ListCollectionsResponse) ContentType() string {
 	return ""
 }
 
+type SearchPreviewResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *PreviewUnlockResponse
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *Error
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r SearchPreviewResponse) GetJSON200() *PreviewUnlockResponse {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r SearchPreviewResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r SearchPreviewResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r SearchPreviewResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r SearchPreviewResponse) GetJSON422() *Error {
+	return r.JSON422
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r SearchPreviewResponse) GetJSON429() *Error {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r SearchPreviewResponse) GetJSON503() *Error {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r SearchPreviewResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SearchPreviewResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SearchPreviewResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SearchPreviewResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // SearchQueryResponse200Headers the declared response headers of an HTTP 200 response for SearchQuery
 type SearchQueryResponse200Headers struct {
 	XBillingMode        *string
@@ -1377,7 +1816,7 @@ type GetCachedResultResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *SearchResponse
+	JSON200 *SearchResultsPreviewResponse
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *Error
 	// JSON404 the response for an HTTP 404 `application/json` response
@@ -1389,7 +1828,7 @@ type GetCachedResultResponse struct {
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r GetCachedResultResponse) GetJSON200() *SearchResponse {
+func (r GetCachedResultResponse) GetJSON200() *SearchResultsPreviewResponse {
 	return r.JSON200
 }
 
@@ -1431,6 +1870,96 @@ func (r GetCachedResultResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r GetCachedResultResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type SearchUnlockResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *PreviewUnlockResponse
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON402 the response for an HTTP 402 `application/json` response
+	JSON402 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON410 the response for an HTTP 410 `application/json` response
+	JSON410 *Error
+	// JSON422 the response for an HTTP 422 `application/json` response
+	JSON422 *Error
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r SearchUnlockResponse) GetJSON200() *PreviewUnlockResponse {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r SearchUnlockResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON402 returns the response for an HTTP 402 `application/json` response
+func (r SearchUnlockResponse) GetJSON402() *Error {
+	return r.JSON402
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r SearchUnlockResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON410 returns the response for an HTTP 410 `application/json` response
+func (r SearchUnlockResponse) GetJSON410() *Error {
+	return r.JSON410
+}
+
+// GetJSON422 returns the response for an HTTP 422 `application/json` response
+func (r SearchUnlockResponse) GetJSON422() *Error {
+	return r.JSON422
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r SearchUnlockResponse) GetJSON429() *Error {
+	return r.JSON429
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r SearchUnlockResponse) GetJSON503() *Error {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r SearchUnlockResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SearchUnlockResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SearchUnlockResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SearchUnlockResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -1587,6 +2116,40 @@ func (c *ClientWithResponses) ListCollectionsWithResponse(ctx context.Context, r
 	return ParseListCollectionsResponse(rsp)
 }
 
+// SearchPreviewWithBodyWithResponse Preview search results without charging
+//
+// Run the same pipeline as POST /api/v1/search/query -- same entitlement checks, same retraction filtering, same relevance ranking -- but never charge for it. Every result comes back locked, with a teaser snippet in `text` and the cost to unlock it. Works even at a zero balance. Consumes no credits, no trial query and no quota.
+//
+// Call POST /api/v1/search/unlock with the returned `queryId` to pay for and receive some or all of the results in full.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/search/preview (the `SearchPreview` operationId).
+func (c *ClientWithResponses) SearchPreviewWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SearchPreviewResponse, error) {
+	rsp, err := c.SearchPreviewWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSearchPreviewResponse(rsp)
+}
+
+// SearchPreviewWithResponse Preview search results without charging
+//
+// Run the same pipeline as POST /api/v1/search/query -- same entitlement checks, same retraction filtering, same relevance ranking -- but never charge for it. Every result comes back locked, with a teaser snippet in `text` and the cost to unlock it. Works even at a zero balance. Consumes no credits, no trial query and no quota.
+//
+// Call POST /api/v1/search/unlock with the returned `queryId` to pay for and receive some or all of the results in full.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/search/preview (the `SearchPreview` operationId).
+func (c *ClientWithResponses) SearchPreviewWithResponse(ctx context.Context, body SearchPreviewJSONRequestBody, reqEditors ...RequestEditorFn) (*SearchPreviewResponse, error) {
+	rsp, err := c.SearchPreview(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSearchPreviewResponse(rsp)
+}
+
 // SearchQueryWithBodyWithResponse Search documents
 //
 // Search one or more collections using natural language or keyword queries. Results are ranked by relevance using hybrid retrieval (dense + sparse + reranking). Pass `collections` (up to 5) to search several collections in one call and receive a single merged, relevance-ranked list with per-result origin labels.
@@ -1636,6 +2199,8 @@ func (c *ClientWithResponses) GetQuotaWithResponse(ctx context.Context, reqEdito
 //
 // Retrieve previously returned search results using the queryId from a prior search response. Returns the same results without billing. The request must use the same API key that performed the original search. Results are available for 7 days.
 //
+// Each result carries `locked`/`tokens`/`cost`: a result not yet paid for through POST /api/v1/search/unlock comes back as a teaser (`locked: true`), never the full text.
+//
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with GET /api/v1/search/results/{queryId} (the `GetCachedResult` operationId).
@@ -1645,6 +2210,36 @@ func (c *ClientWithResponses) GetCachedResultWithResponse(ctx context.Context, q
 		return nil, err
 	}
 	return ParseGetCachedResultResponse(rsp)
+}
+
+// SearchUnlockWithBodyWithResponse Pay for previewed results and receive them in full
+//
+// Charges only for results not already unlocked by an earlier call against the same `queryId` -- re-sending the same ids costs nothing. Omit `resultIds` (or pass `null`) to unlock everything from the preview.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/search/unlock (the `SearchUnlock` operationId).
+func (c *ClientWithResponses) SearchUnlockWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SearchUnlockResponse, error) {
+	rsp, err := c.SearchUnlockWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSearchUnlockResponse(rsp)
+}
+
+// SearchUnlockWithResponse Pay for previewed results and receive them in full
+//
+// Charges only for results not already unlocked by an earlier call against the same `queryId` -- re-sending the same ids costs nothing. Omit `resultIds` (or pass `null`) to unlock everything from the preview.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/search/unlock (the `SearchUnlock` operationId).
+func (c *ClientWithResponses) SearchUnlockWithResponse(ctx context.Context, body SearchUnlockJSONRequestBody, reqEditors ...RequestEditorFn) (*SearchUnlockResponse, error) {
+	rsp, err := c.SearchUnlock(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSearchUnlockResponse(rsp)
 }
 
 // SearchCollectionWithBodyWithResponse Search a single collection by name
@@ -1840,6 +2435,74 @@ func ParseListCollectionsResponse(rsp *http.Response) (*ListCollectionsResponse,
 	return response, nil
 }
 
+// ParseSearchPreviewResponse parses an HTTP response from a SearchPreviewWithResponse call
+func ParseSearchPreviewResponse(rsp *http.Response) (*SearchPreviewResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SearchPreviewResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PreviewUnlockResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseSearchQueryResponse parses an HTTP response from a SearchQueryWithResponse call
 func ParseSearchQueryResponse(rsp *http.Response) (*SearchQueryResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -2018,7 +2681,7 @@ func ParseGetCachedResultResponse(rsp *http.Response) (*GetCachedResultResponse,
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest SearchResponse
+		var dest SearchResultsPreviewResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -2065,6 +2728,81 @@ func ParseGetCachedResultResponse(rsp *http.Response) (*GetCachedResultResponse,
 			headers.XCacheExpires = &value
 		}
 		response.Headers200 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseSearchUnlockResponse parses an HTTP response from a SearchUnlockWithResponse call
+func ParseSearchUnlockResponse(rsp *http.Response) (*SearchUnlockResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SearchUnlockResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PreviewUnlockResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 402:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON402 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 410:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON410 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil

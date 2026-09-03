@@ -1,0 +1,12 @@
+{
+  "op": "unlock",
+  "args": {"query_id": "q-prev", "result_ids": ["r1", "r2"]},
+  "request": {"method": "POST", "path": "/api/v1/search/unlock", "body": {"queryId": "q-prev", "resultIds": ["r1", "r2"]}},
+  "response": {"status": 200, "headers": {},
+               "body": {"queryId": "q-prev",
+                        "results": [{"id": "r1", "text": "full", "locked": false},
+                                    {"id": "r2", "text": "full", "locked": false},
+                                    {"id": "r3", "text": "teaser...", "locked": true, "tokens": 90, "cost": "0.090000"}],
+                        "costToUnlockRemaining": "0.090000", "costCharged": "0.300000"}},
+  "expect": {"error": null, "field": "costToUnlockRemaining", "value": "0.090000"}
+}

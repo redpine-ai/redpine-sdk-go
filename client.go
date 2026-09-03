@@ -292,7 +292,67 @@ func (c *Redpine) AssistedSearch(ctx context.Context, query string, o AssistedSe
 	return decode[AssistedSearchResponse](raw)
 }
 
-func (c *Redpine) GetResults(ctx context.Context, queryID string) (*SearchResponse, error) {
+// PreviewOptions configures Preview. Exactly one of Collection / Collections.
+type PreviewOptions struct {
+	Collection  string
+	Collections []string
+	Limit       int
+	Filters     any // Filter, map[string]any, or nil
+}
+
+// Preview is free: teaser rows plus the cost to unlock each. Never charged, never a quota slot.
+func (c *Redpine) Preview(ctx context.Context, query string, o PreviewOptions) (*PreviewUnlockResponse, error) {
+	if err := oneTarget(o.Collection, o.Collections); err != nil {
+		return nil, err
+	}
+	filters, err := toFilterMap(o.Filters)
+	if err != nil {
+		return nil, err
+	}
+	body := SearchPreviewJSONRequestBody{Query: query}
+	if o.Collection != "" {
+		body.Collection = &o.Collection
+	}
+	if len(o.Collections) > 0 {
+		cs := append([]string{}, o.Collections...)
+		body.Collections = &cs
+	}
+	lim := limitOr(o.Limit)
+	body.Limit, body.Filters = &lim, filters
+	raw, err := c.call(ctx, func() (*http.Response, []byte, error) {
+		r, err := c.gen.SearchPreviewWithResponse(ctx, body)
+		if err != nil {
+			return nil, nil, err
+		}
+		return r.HTTPResponse, r.Body, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return decode[PreviewUnlockResponse](raw)
+}
+
+// Unlock pays for previewed rows. A nil resultIDs unlocks every row; re-sending paid ids is free.
+func (c *Redpine) Unlock(ctx context.Context, queryID string, resultIDs []string) (*PreviewUnlockResponse, error) {
+	body := SearchUnlockJSONRequestBody{QueryId: queryID}
+	if resultIDs != nil {
+		ids := append([]string{}, resultIDs...)
+		body.ResultIds = &ids
+	}
+	raw, err := c.call(ctx, func() (*http.Response, []byte, error) {
+		r, err := c.gen.SearchUnlockWithResponse(ctx, body)
+		if err != nil {
+			return nil, nil, err
+		}
+		return r.HTTPResponse, r.Body, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return decode[PreviewUnlockResponse](raw)
+}
+
+func (c *Redpine) GetResults(ctx context.Context, queryID string) (*SearchResultsPreviewResponse, error) {
 	raw, err := c.call(ctx, func() (*http.Response, []byte, error) {
 		r, err := c.gen.GetCachedResultWithResponse(ctx, queryID)
 		if err != nil {
@@ -303,7 +363,7 @@ func (c *Redpine) GetResults(ctx context.Context, queryID string) (*SearchRespon
 	if err != nil {
 		return nil, err
 	}
-	return decode[SearchResponse](raw)
+	return decode[SearchResultsPreviewResponse](raw)
 }
 
 func (c *Redpine) Quota(ctx context.Context) (*QuotaInfo, error) {

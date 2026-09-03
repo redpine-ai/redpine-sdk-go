@@ -1,0 +1,12 @@
+{
+  "op": "preview",
+  "args": {"query": "q", "collection": "corpus", "filters": {"journal": "Nature"}},
+  "request": {"method": "POST", "path": "/api/v1/search/preview",
+              "body": {"query": "q", "collection": "corpus", "limit": 10, "filters": {"journal": "Nature"}}},
+  "response": {"status": 200, "headers": {},
+               "body": {"queryId": "q-prev",
+                        "results": [{"id": "r1", "text": "teaser...", "locked": true, "tokens": 214, "cost": "0.214000",
+                                     "collection": "corpus", "metadata": {"title": "T"}}],
+                        "costToUnlockRemaining": "0.214000", "costCharged": null}},
+  "expect": {"error": null, "field": "costToUnlockRemaining", "value": "0.214000"}
+}

@@ -67,8 +67,10 @@ func bptr(m map[string]any, k string) *bool {
 
 var errTypes = map[string]func(error) bool{
 	"AuthError":           func(e error) bool { var x *AuthError; return errors.As(e, &x) },
+	"InsufficientCredits": func(e error) bool { var x *InsufficientCreditsError; return errors.As(e, &x) },
 	"AccessDenied":        func(e error) bool { var x *AccessDeniedError; return errors.As(e, &x) },
 	"NotFound":            func(e error) bool { var x *NotFoundError; return errors.As(e, &x) },
+	"Expired":             func(e error) bool { var x *ExpiredError; return errors.As(e, &x) },
 	"ValidationError":     func(e error) bool { var x *ValidationError; return errors.As(e, &x) },
 	"QuotaExceeded":       func(e error) bool { var x *QuotaExceededError; return errors.As(e, &x) },
 	"AssistedUnavailable": func(e error) bool { var x *AssistedUnavailableError; return errors.As(e, &x) },
@@ -132,6 +134,15 @@ func TestContractFixtures(t *testing.T) {
 				result, callErr = c.AssistedSearch(ctx, str(a, "query"), AssistedSearchOptions{
 					Collection: str(a, "collection"), Collections: strs(a, "collections"), Limit: num(a, "limit"),
 					Filters: a["filters"], AllowClarification: bptr(a, "allow_clarification"), IncludeMetadata: bptr(a, "include_metadata")})
+			case "preview":
+				result, callErr = c.Preview(ctx, str(a, "query"), PreviewOptions{
+					Collection: str(a, "collection"), Collections: strs(a, "collections"), Limit: num(a, "limit"), Filters: a["filters"]})
+			case "unlock":
+				var ids []string
+				if _, ok := a["result_ids"]; ok {
+					ids = strs(a, "result_ids")
+				}
+				result, callErr = c.Unlock(ctx, str(a, "query_id"), ids)
 			case "get_results":
 				result, callErr = c.GetResults(ctx, str(a, "query_id"))
 			case "quota":

@@ -17,8 +17,10 @@ func TestErrorFromResponseMapsStatus(t *testing.T) {
 		check  func(error) bool
 	}{
 		{401, func(e error) bool { var x *AuthError; return errors.As(e, &x) }},
+		{402, func(e error) bool { var x *InsufficientCreditsError; return errors.As(e, &x) }},
 		{403, func(e error) bool { var x *AccessDeniedError; return errors.As(e, &x) }},
 		{404, func(e error) bool { var x *NotFoundError; return errors.As(e, &x) }},
+		{410, func(e error) bool { var x *ExpiredError; return errors.As(e, &x) }},
 		{422, func(e error) bool { var x *ValidationError; return errors.As(e, &x) }},
 		{429, func(e error) bool { var x *QuotaExceededError; return errors.As(e, &x) }},
 		{503, func(e error) bool { var x *AssistedUnavailableError; return errors.As(e, &x) }},

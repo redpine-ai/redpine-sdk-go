@@ -1,0 +1,8 @@
+{
+  "op": "get_results",
+  "args": {"query_id": "q-old"},
+  "request": {"method": "GET", "path": "/api/v1/search/results/q-old", "body": null},
+  "response": {"status": 410, "headers": {},
+               "body": {"error": {"code": "CACHED_RESULT_EXPIRED", "message": "expired", "requestId": "r-410"}}},
+  "expect": {"error": "Expired", "field": null, "value": null}
+}

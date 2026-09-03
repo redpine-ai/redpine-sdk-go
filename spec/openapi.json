@@ -386,6 +386,116 @@
                 ],
                 "type": "object"
             },
+            "PreviewResult": {
+                "properties": {
+                    "collection": {
+                        "default": null,
+                        "description": "Origin collection of this result \u2014 the name as requested, so a logical collection reports the logical name rather than the physical one it resolves to. Always populated.",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "cost": {
+                        "default": null,
+                        "description": "Cost to unlock this one result.",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "id": {
+                        "description": "Chunk/point ID",
+                        "type": "string"
+                    },
+                    "locked": {
+                        "description": "True when text is a teaser rather than the full chunk",
+                        "type": "boolean"
+                    },
+                    "metadata": {
+                        "additionalProperties": true,
+                        "default": null,
+                        "description": "Document metadata (title, authors, journal, etc.). Always present on /search/preview and /search/unlock, which take no includeMetadata option. On /search/results it is null when the original search set includeMetadata to false.",
+                        "type": [
+                            "object",
+                            "null"
+                        ]
+                    },
+                    "text": {
+                        "description": "Full chunk text when `locked` is false. A short teaser snippet \u2014 never the full chunk \u2014 when `locked` is true.",
+                        "type": "string"
+                    },
+                    "tokens": {
+                        "default": null,
+                        "description": "Billable tokens to unlock this result.",
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "id",
+                    "text",
+                    "locked"
+                ],
+                "type": "object"
+            },
+            "PreviewUnlockResponse": {
+                "properties": {
+                    "costCharged": {
+                        "default": null,
+                        "description": "What THIS call charged \u2014 not a running total. Null on a preview (always free) and on an unlock whose entire delta was already unlocked.",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "costToUnlockRemaining": {
+                        "description": "Cost to unlock every result not yet unlocked. An estimate, not a binding quote: it is summed from each result's own individually-rounded cost, while the amount actually charged on the next unlock is computed per collection at that call's combined token total \u2014 the two can differ by a rounding fraction.",
+                        "type": "string"
+                    },
+                    "filterWarnings": {
+                        "default": null,
+                        "description": "Advisory warnings about the supplied filter \u2014 for example filtering on a field with no payload index, which is matched by scanning. The search still runs. Omitted when there are none.",
+                        "items": {
+                            "$ref": "#/components/schemas/FilterWarning"
+                        },
+                        "type": [
+                            "array",
+                            "null"
+                        ]
+                    },
+                    "journalMetricExpansions": {
+                        "default": null,
+                        "description": "What each journal-metric threshold (e.g. impactFactor >= 5) expanded to. Omitted when no metric filter was used.",
+                        "items": {
+                            "$ref": "#/components/schemas/JournalMetricExpansion"
+                        },
+                        "type": [
+                            "array",
+                            "null"
+                        ]
+                    },
+                    "queryId": {
+                        "description": "Pass this to POST /search/unlock.",
+                        "type": "string"
+                    },
+                    "results": {
+                        "description": "Every result from the query, filtered through the unlock ledger.",
+                        "items": {
+                            "$ref": "#/components/schemas/PreviewResult"
+                        },
+                        "type": "array"
+                    }
+                },
+                "required": [
+                    "queryId",
+                    "results",
+                    "costToUnlockRemaining"
+                ],
+                "type": "object"
+            },
             "QueryUnderstanding": {
                 "description": "How the endpoint read the query.",
                 "properties": {
@@ -479,6 +589,58 @@
                 ],
                 "type": "object"
             },
+            "SearchPreviewRequest": {
+                "description": "The result-selection half of SearchRequest. A preview quotes results rather than delivering them, so it takes no content-delivery options: figures are never fetched (they are not priced into the quote) and metadata is always returned. Provide exactly one of `collection` (single) or `collections` (multi).",
+                "properties": {
+                    "collection": {
+                        "default": null,
+                        "description": "Name of the collection to search. Mutually exclusive with `collections`.",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "collections": {
+                        "default": null,
+                        "description": "Collections to search together (max 5, unique). Each collection is searched with its own access entitlements and the results are merged into one relevance-ranked list; each result carries its origin `collection`. Mutually exclusive with `collection`.",
+                        "items": {
+                            "type": "string"
+                        },
+                        "maxItems": 5,
+                        "minItems": 1,
+                        "type": [
+                            "array",
+                            "null"
+                        ]
+                    },
+                    "filters": {
+                        "additionalProperties": true,
+                        "default": null,
+                        "description": "Optional metadata filter. Two accepted forms.\n\nFlat (top-level keys are ANDed): `{\"journal\": \"Nature\", \"publication_date\": {\"gte\": \"2020-01-01\"}}`.\n\nStructured DSL (for OR / nesting): `{\"and\": [{\"field\": \"journal\", \"eq\": \"Nature\"}]}`. Operators: `eq`, `ne`, `in`, `not_in`, `gt`, `gte`, `lt`, `lte`, `between`. Combinators: `and`, `or`, `not`.\n\nExclusion uses `ne` / `not_in` / `not` \u2014 there is no separate syntax: `{\"and\": [{\"field\": \"issn\", \"not_in\": [\"1234-5678\"]}]}`.\n\nIndexed on every collection (any other field is matched by scanning and returns a `filterWarnings` entry): `article_type`, `chapter_authors`, `chapter_number`, `chapter_title`, `doc_id`, `doi`, `isbn`, `issn`, `journal`, `keywords`, `license`, `open_access`, `publication_date`, `publisher`, `section`.\n\nIndexed on the editorial collections only (People Inc): `last_updated_date`, `medical_board_approved`, `topic`, `url`.\n\n`issn` accepts hyphenated or bare, upper- or lower-case X (`\"1664-302X\"`, `\"1664302x\"`). `doi` is matched case-insensitively and an optional `https://doi.org/` or `doi:` prefix is accepted.\n\n`journal_metric.2yr_mean_citedness`, `journal_metric.h_index` and `journal_metric.i10_index` accept range operators only and are resolved server-side into the matching ISSNs; see `journalMetricExpansions` in the response.",
+                        "type": [
+                            "object",
+                            "null"
+                        ]
+                    },
+                    "limit": {
+                        "default": 10,
+                        "description": "Maximum results to return (default 10, max 30)",
+                        "maximum": 30,
+                        "minimum": 1,
+                        "type": "integer"
+                    },
+                    "query": {
+                        "description": "Natural language or keyword search query.",
+                        "maxLength": 1000,
+                        "minLength": 1,
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "query"
+                ],
+                "type": "object"
+            },
             "SearchRequest": {
                 "description": "Provide exactly one of `collection` (single) or `collections` (multi-collection search).",
                 "properties": {
@@ -506,7 +668,7 @@
                     "filters": {
                         "additionalProperties": true,
                         "default": null,
-                        "description": "Optional metadata filter. Two accepted forms.\n\nFlat (top-level keys are ANDed): `{\"journal\": \"Nature\", \"publication_date\": {\"gte\": \"2020-01-01\"}}`.\n\nStructured DSL (for OR / nesting): `{\"and\": [{\"field\": \"journal\", \"eq\": \"Nature\"}]}`. Operators: `eq`, `ne`, `in`, `not_in`, `gt`, `gte`, `lt`, `lte`, `between`. Combinators: `and`, `or`, `not`.\n\nExclusion uses `ne` / `not_in` / `not` \u2014 there is no separate syntax: `{\"and\": [{\"field\": \"issn\", \"not_in\": [\"1234-5678\"]}]}`.\n\nIndexed on every collection (any other field is matched by scanning and returns a `filterWarnings` entry): `article_type`, `doc_id`, `doi`, `issn`, `journal`, `keywords`, `publication_date`, `publisher`, `section`.\n\nIndexed on the editorial collections only (People Inc): `medical_board_approved`, `topic`, `url`.\n\n`issn` accepts hyphenated or bare, upper- or lower-case X (`\"1664-302X\"`, `\"1664302x\"`). `doi` is matched case-insensitively and an optional `https://doi.org/` or `doi:` prefix is accepted.\n\n`journal_metric.2yr_mean_citedness`, `journal_metric.h_index` and `journal_metric.i10_index` accept range operators only and are resolved server-side into the matching ISSNs; see `journalMetricExpansions` in the response.",
+                        "description": "Optional metadata filter. Two accepted forms.\n\nFlat (top-level keys are ANDed): `{\"journal\": \"Nature\", \"publication_date\": {\"gte\": \"2020-01-01\"}}`.\n\nStructured DSL (for OR / nesting): `{\"and\": [{\"field\": \"journal\", \"eq\": \"Nature\"}]}`. Operators: `eq`, `ne`, `in`, `not_in`, `gt`, `gte`, `lt`, `lte`, `between`. Combinators: `and`, `or`, `not`.\n\nExclusion uses `ne` / `not_in` / `not` \u2014 there is no separate syntax: `{\"and\": [{\"field\": \"issn\", \"not_in\": [\"1234-5678\"]}]}`.\n\nIndexed on every collection (any other field is matched by scanning and returns a `filterWarnings` entry): `article_type`, `chapter_authors`, `chapter_number`, `chapter_title`, `doc_id`, `doi`, `isbn`, `issn`, `journal`, `keywords`, `license`, `open_access`, `publication_date`, `publisher`, `section`.\n\nIndexed on the editorial collections only (People Inc): `last_updated_date`, `medical_board_approved`, `topic`, `url`.\n\n`issn` accepts hyphenated or bare, upper- or lower-case X (`\"1664-302X\"`, `\"1664302x\"`). `doi` is matched case-insensitively and an optional `https://doi.org/` or `doi:` prefix is accepted.\n\n`journal_metric.2yr_mean_citedness`, `journal_metric.h_index` and `journal_metric.i10_index` accept range operators only and are resolved server-side into the matching ISSNs; see `journalMetricExpansions` in the response.",
                         "type": [
                             "object",
                             "null"
@@ -642,11 +804,81 @@
                     "text"
                 ],
                 "type": "object"
+            },
+            "SearchResultsPreviewResponse": {
+                "properties": {
+                    "filterWarnings": {
+                        "default": null,
+                        "description": "Advisory warnings about the supplied filter \u2014 for example filtering on a field with no payload index, which is matched by scanning. The search still runs. Omitted when there are none.",
+                        "items": {
+                            "$ref": "#/components/schemas/FilterWarning"
+                        },
+                        "type": [
+                            "array",
+                            "null"
+                        ]
+                    },
+                    "journalMetricExpansions": {
+                        "default": null,
+                        "description": "How each journal-metric condition resolved to ISSNs; omitted when no metric filter was used",
+                        "items": {
+                            "$ref": "#/components/schemas/JournalMetricExpansion"
+                        },
+                        "type": [
+                            "array",
+                            "null"
+                        ]
+                    },
+                    "latencyMs": {
+                        "description": "Search latency in milliseconds",
+                        "type": "integer"
+                    },
+                    "queryId": {
+                        "description": "Unique identifier for this query, matching the original search response.",
+                        "type": "string"
+                    },
+                    "results": {
+                        "description": "Every result from the original search, filtered through the unlock ledger.",
+                        "items": {
+                            "$ref": "#/components/schemas/PreviewResult"
+                        },
+                        "type": "array"
+                    }
+                },
+                "required": [
+                    "results",
+                    "queryId",
+                    "latencyMs"
+                ],
+                "type": "object"
+            },
+            "UnlockRequest": {
+                "properties": {
+                    "queryId": {
+                        "description": "The `queryId` from a previous POST /search/preview response.",
+                        "type": "string"
+                    },
+                    "resultIds": {
+                        "default": null,
+                        "description": "Result ids to unlock. Omit (or pass `null`) to unlock every result from the preview. Re-sending an id that is already unlocked costs nothing \u2014 only the delta is charged.",
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": [
+                            "array",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "queryId"
+                ],
+                "type": "object"
             }
         },
         "securitySchemes": {
             "BearerAuth": {
-                "description": "API key authentication. Pass your key in the Authorization header as `Bearer sk_live_...`. An `X-API-Key: sk_live_...` header is also accepted as an alternative. Keys are created in the Redpine Connect dashboard under Settings > API Keys.",
+                "description": "API key authentication. Pass your key in the Authorization header as `Bearer sk_live_...`. An `X-API-Key: sk_live_...` header is also accepted as an alternative. Keys are created in the Redpine Connect dashboard under Settings > API Keys.\n\nKeys come in two kinds. A live key (`sk_live_...`) searches real content and spends credits. A sandbox key (`sk_test_...`) returns canned results at no cost and never reaches licensed content, so you can build and test an integration before spending anything. Sandbox responses have the same shape as live ones and every result is marked `synthetic`, so going live is a matter of swapping the key. Check the `X-Billing-Mode` response header to confirm which you are using.",
                 "scheme": "bearer",
                 "type": "http"
             }
@@ -685,12 +917,13 @@
                         "description": "Verified results, a clarification request, or an explicit no-relevant-results outcome",
                         "headers": {
                             "X-Billing-Mode": {
-                                "description": "How this query was billed. `live`: charged normally. `exempt`: the org is billing-exempt (no charge). `trial`: covered by trial credit. Never sent for `kill_switch` (billing disabled org-wide) \u2014 the billing headers are omitted entirely in that case.",
+                                "description": "How this query was billed. `live`: charged normally. `exempt`: the org is billing-exempt (no charge). `trial`: covered by trial credit. `sandbox`: a sandbox key (`sk_test_...`) returned synthetic results at no cost. Never sent for `kill_switch` (billing disabled org-wide) \u2014 the billing headers are omitted entirely in that case.",
                                 "schema": {
                                     "enum": [
                                         "live",
                                         "exempt",
-                                        "trial"
+                                        "trial",
+                                        "sandbox"
                                     ],
                                     "type": "string"
                                 }
@@ -842,6 +1075,98 @@
                 ]
             }
         },
+        "/api/v1/search/preview": {
+            "post": {
+                "description": "Run the same pipeline as POST /api/v1/search/query -- same entitlement checks, same retraction filtering, same relevance ranking -- but never charge for it. Every result comes back locked, with a teaser snippet in `text` and the cost to unlock it. Works even at a zero balance. Consumes no credits, no trial query and no quota.\n\nCall POST /api/v1/search/unlock with the returned `queryId` to pay for and receive some or all of the results in full.",
+                "operationId": "searchPreview",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SearchPreviewRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PreviewUnlockResponse"
+                                }
+                            }
+                        },
+                        "description": "Every result, locked, plus the total cost to unlock them all"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "description": "Missing or invalid API key"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "description": "API key does not have access to the requested collection"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "description": "Collection not found"
+                    },
+                    "422": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "description": "Validation error (e.g. query too long)"
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "description": "This org's preview rate limit was exceeded (shared with the MCP preview tool) -- not the org's query quota, which a preview never consumes."
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "description": "Search temporarily unavailable (Qdrant is down)"
+                    }
+                },
+                "summary": "Preview search results without charging",
+                "tags": [
+                    "search"
+                ]
+            }
+        },
         "/api/v1/search/query": {
             "post": {
                 "description": "Search one or more collections using natural language or keyword queries. Results are ranked by relevance using hybrid retrieval (dense + sparse + reranking). Pass `collections` (up to 5) to search several collections in one call and receive a single merged, relevance-ranked list with per-result origin labels.",
@@ -868,12 +1193,13 @@
                         "description": "Search results",
                         "headers": {
                             "X-Billing-Mode": {
-                                "description": "How this query was billed. `live`: charged normally. `exempt`: the org is billing-exempt (no charge). `trial`: covered by trial credit. Never sent for `kill_switch` (billing disabled org-wide) \u2014 the billing headers are omitted entirely in that case.",
+                                "description": "How this query was billed. `live`: charged normally. `exempt`: the org is billing-exempt (no charge). `trial`: covered by trial credit. `sandbox`: a sandbox key (`sk_test_...`) returned synthetic results at no cost. Never sent for `kill_switch` (billing disabled org-wide) \u2014 the billing headers are omitted entirely in that case.",
                                 "schema": {
                                     "enum": [
                                         "live",
                                         "exempt",
-                                        "trial"
+                                        "trial",
+                                        "sandbox"
                                     ],
                                     "type": "string"
                                 }
@@ -1024,7 +1350,7 @@
         },
         "/api/v1/search/results/{queryId}": {
             "get": {
-                "description": "Retrieve previously returned search results using the queryId from a prior search response. Returns the same results without billing. The request must use the same API key that performed the original search. Results are available for 7 days.",
+                "description": "Retrieve previously returned search results using the queryId from a prior search response. Returns the same results without billing. The request must use the same API key that performed the original search. Results are available for 7 days.\n\nEach result carries `locked`/`tokens`/`cost`: a result not yet paid for through POST /api/v1/search/unlock comes back as a teaser (`locked: true`), never the full text.",
                 "operationId": "getCachedResult",
                 "parameters": [
                     {
@@ -1042,11 +1368,11 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/SearchResponse"
+                                    "$ref": "#/components/schemas/SearchResultsPreviewResponse"
                                 }
                             }
                         },
-                        "description": "Cached search results (identical to original response, with latencyMs: 0)",
+                        "description": "Cached search results, filtered through the unlock ledger (latencyMs: 0)",
                         "headers": {
                             "X-Cache": {
                                 "description": "Indicates this is a cached response.",
@@ -1101,6 +1427,108 @@
                 ]
             }
         },
+        "/api/v1/search/unlock": {
+            "post": {
+                "description": "Charges only for results not already unlocked by an earlier call against the same `queryId` -- re-sending the same ids costs nothing. Omit `resultIds` (or pass `null`) to unlock everything from the preview.",
+                "operationId": "searchUnlock",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UnlockRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PreviewUnlockResponse"
+                                }
+                            }
+                        },
+                        "description": "The full result set filtered through the unlock ledger, plus what this call charged"
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "description": "Missing or invalid API key"
+                    },
+                    "402": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "description": "Billing suspended for this organization, or insufficient credits for the delta"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "description": "queryId not found or belongs to a different API key"
+                    },
+                    "410": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "description": "The preview has expired, or was written by an older payload version"
+                    },
+                    "422": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "description": "One or more resultIds are not in this preview"
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "description": "Rate or quota limit exceeded, or the API key's spending budget is exhausted. An unlock that buys new results counts as one query against the org's quota; a preview and a repeat unlock count for nothing. Nothing is charged when this fires."
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "description": "The quota service is unavailable, so the quota slot this unlock would consume could not be counted and the unlock was refused. The refusal happens before the charge commits: nothing is charged and no result is unlocked."
+                    }
+                },
+                "summary": "Pay for previewed results and receive them in full",
+                "tags": [
+                    "search"
+                ]
+            }
+        },
         "/api/v1/search/{collection}": {
             "post": {
                 "description": "Shorthand for POST /api/v1/search/query with the collection named in the path instead of the body. Same pipeline, same response shape, one collection per call \u2014 use /query's `collections` form to search several at once.",
@@ -1126,7 +1554,7 @@
                                     "filters": {
                                         "additionalProperties": true,
                                         "default": null,
-                                        "description": "Optional metadata filter. Two accepted forms.\n\nFlat (top-level keys are ANDed): `{\"journal\": \"Nature\", \"publication_date\": {\"gte\": \"2020-01-01\"}}`.\n\nStructured DSL (for OR / nesting): `{\"and\": [{\"field\": \"journal\", \"eq\": \"Nature\"}]}`. Operators: `eq`, `ne`, `in`, `not_in`, `gt`, `gte`, `lt`, `lte`, `between`. Combinators: `and`, `or`, `not`.\n\nExclusion uses `ne` / `not_in` / `not` \u2014 there is no separate syntax: `{\"and\": [{\"field\": \"issn\", \"not_in\": [\"1234-5678\"]}]}`.\n\nIndexed on every collection (any other field is matched by scanning and returns a `filterWarnings` entry): `article_type`, `doc_id`, `doi`, `issn`, `journal`, `keywords`, `publication_date`, `publisher`, `section`.\n\nIndexed on the editorial collections only (People Inc): `medical_board_approved`, `topic`, `url`.\n\n`issn` accepts hyphenated or bare, upper- or lower-case X (`\"1664-302X\"`, `\"1664302x\"`). `doi` is matched case-insensitively and an optional `https://doi.org/` or `doi:` prefix is accepted.\n\n`journal_metric.2yr_mean_citedness`, `journal_metric.h_index` and `journal_metric.i10_index` accept range operators only and are resolved server-side into the matching ISSNs; see `journalMetricExpansions` in the response.",
+                                        "description": "Optional metadata filter. Two accepted forms.\n\nFlat (top-level keys are ANDed): `{\"journal\": \"Nature\", \"publication_date\": {\"gte\": \"2020-01-01\"}}`.\n\nStructured DSL (for OR / nesting): `{\"and\": [{\"field\": \"journal\", \"eq\": \"Nature\"}]}`. Operators: `eq`, `ne`, `in`, `not_in`, `gt`, `gte`, `lt`, `lte`, `between`. Combinators: `and`, `or`, `not`.\n\nExclusion uses `ne` / `not_in` / `not` \u2014 there is no separate syntax: `{\"and\": [{\"field\": \"issn\", \"not_in\": [\"1234-5678\"]}]}`.\n\nIndexed on every collection (any other field is matched by scanning and returns a `filterWarnings` entry): `article_type`, `chapter_authors`, `chapter_number`, `chapter_title`, `doc_id`, `doi`, `isbn`, `issn`, `journal`, `keywords`, `license`, `open_access`, `publication_date`, `publisher`, `section`.\n\nIndexed on the editorial collections only (People Inc): `last_updated_date`, `medical_board_approved`, `topic`, `url`.\n\n`issn` accepts hyphenated or bare, upper- or lower-case X (`\"1664-302X\"`, `\"1664302x\"`). `doi` is matched case-insensitively and an optional `https://doi.org/` or `doi:` prefix is accepted.\n\n`journal_metric.2yr_mean_citedness`, `journal_metric.h_index` and `journal_metric.i10_index` accept range operators only and are resolved server-side into the matching ISSNs; see `journalMetricExpansions` in the response.",
                                         "type": [
                                             "object",
                                             "null"
@@ -1198,12 +1626,13 @@
                         "description": "Search results",
                         "headers": {
                             "X-Billing-Mode": {
-                                "description": "How this query was billed. `live`: charged normally. `exempt`: the org is billing-exempt (no charge). `trial`: covered by trial credit. Never sent for `kill_switch` (billing disabled org-wide) \u2014 the billing headers are omitted entirely in that case.",
+                                "description": "How this query was billed. `live`: charged normally. `exempt`: the org is billing-exempt (no charge). `trial`: covered by trial credit. `sandbox`: a sandbox key (`sk_test_...`) returned synthetic results at no cost. Never sent for `kill_switch` (billing disabled org-wide) \u2014 the billing headers are omitted entirely in that case.",
                                 "schema": {
                                     "enum": [
                                         "live",
                                         "exempt",
-                                        "trial"
+                                        "trial",
+                                        "sandbox"
                                     ],
                                     "type": "string"
                                 }

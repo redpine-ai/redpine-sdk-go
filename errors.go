@@ -34,11 +34,17 @@ func (e *APIError) Error() string {
 // AuthError is 401: missing or invalid API key.
 type AuthError struct{ APIError }
 
+// InsufficientCreditsError is 402: billing suspended, or not enough credits to unlock the requested rows.
+type InsufficientCreditsError struct{ APIError }
+
 // AccessDeniedError is 403: key has no access to the requested collection.
 type AccessDeniedError struct{ APIError }
 
 // NotFoundError is 404: collection or queryId not found.
 type NotFoundError struct{ APIError }
+
+// ExpiredError is 410: the cached result or preview is past its 7-day window. Run the search again.
+type ExpiredError struct{ APIError }
 
 // ValidationError is 422: request rejected (query too long, bad filter, ...).
 type ValidationError struct{ APIError }
@@ -53,8 +59,10 @@ type QuotaExceededError struct {
 type AssistedUnavailableError struct{ APIError }
 
 func (e *AuthError) Unwrap() error                { return &e.APIError }
+func (e *InsufficientCreditsError) Unwrap() error { return &e.APIError }
 func (e *AccessDeniedError) Unwrap() error        { return &e.APIError }
 func (e *NotFoundError) Unwrap() error            { return &e.APIError }
+func (e *ExpiredError) Unwrap() error             { return &e.APIError }
 func (e *ValidationError) Unwrap() error          { return &e.APIError }
 func (e *QuotaExceededError) Unwrap() error       { return &e.APIError }
 func (e *AssistedUnavailableError) Unwrap() error { return &e.APIError }
@@ -94,10 +102,14 @@ func errorFromResponse(status int, body []byte, header http.Header) error {
 	switch status {
 	case 401:
 		return &AuthError{base}
+	case 402:
+		return &InsufficientCreditsError{base}
 	case 403:
 		return &AccessDeniedError{base}
 	case 404:
 		return &NotFoundError{base}
+	case 410:
+		return &ExpiredError{base}
 	case 422:
 		return &ValidationError{base}
 	case 429:
