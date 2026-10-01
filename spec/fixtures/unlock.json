@@ -4,7 +4,7 @@
   "request": {"method": "POST", "path": "/api/v1/search/unlock", "body": {"queryId": "q-prev"}},
   "response": {"status": 200, "headers": {},
                "body": {"queryId": "q-prev",
-                        "results": [{"id": "r1", "text": "full chunk text", "locked": false, "tokens": 214, "cost": "0.214000",
+                        "results": [{"id": "r1", "text": "full chunk text", "locked": false, "figureCount": 0, "tokens": 214, "cost": "0.214000",
                                      "collection": "corpus", "metadata": {"title": "T"}}],
                         "costToUnlockRemaining": "0.000000", "costCharged": "0.214000"}},
   "expect": {"error": null, "field": "costCharged", "value": "0.214000"}

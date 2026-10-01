@@ -91,7 +91,7 @@ type AssistedSearchResponse struct {
 	// Clarification Set only when status is `clarification_needed`.
 	Clarification *ClarificationInfo `json:"clarification,omitempty"`
 
-	// FilterWarnings Advisory warnings about the supplied filter — for example filtering on a field with no payload index, which is matched by scanning. The search still runs. Omitted when there are none.
+	// FilterWarnings Advisory warnings about the supplied filter — for example filtering on a known field with no payload index, which is matched by scanning, or a collection excluded because it holds only open-access content and the filter asked for open_access=false. The search still runs. Omitted when there are none.
 	FilterWarnings *[]FilterWarning `json:"filterWarnings,omitempty"`
 
 	// IterationsRun Number of search+replan rounds executed
@@ -221,13 +221,16 @@ type PreviewResult struct {
 	// Cost Cost to unlock this one result.
 	Cost *string `json:"cost,omitempty"`
 
+	// FigureCount How many figures this result carries. Reported on locked rows too — the captions and images stay behind the paywall, but the count is what tells you whether unlocking with includeFigures is worth it. 0 for text-only content.
+	FigureCount int `json:"figureCount"`
+
 	// Id Chunk/point ID
 	Id string `json:"id"`
 
 	// Locked True when text is a teaser rather than the full chunk
 	Locked bool `json:"locked"`
 
-	// Metadata Document metadata (title, authors, journal, etc.). Always present on /search/preview and /search/unlock, which take no includeMetadata option. On /search/results it is null when the original search set includeMetadata to false.
+	// Metadata Document metadata (title, authors, journal, etc.). Always present on /search/preview and /search/unlock, which take no includeMetadata option. On /search/results it is null when the original search set includeMetadata to false. `figures` (captions, and `image_data` when images were requested) is present only on unlocked results — a locked result reports `figureCount` and nothing else about its figures.
 	Metadata *map[string]interface{} `json:"metadata,omitempty"`
 
 	// Text Full chunk text when `locked` is false. A short teaser snippet — never the full chunk — when `locked` is true.
@@ -245,10 +248,13 @@ type PreviewUnlockResponse struct {
 	// CostToUnlockRemaining Cost to unlock every result not yet unlocked. An estimate, not a binding quote: it is summed from each result's own individually-rounded cost, while the amount actually charged on the next unlock is computed per collection at that call's combined token total — the two can differ by a rounding fraction.
 	CostToUnlockRemaining string `json:"costToUnlockRemaining"`
 
-	// FilterWarnings Advisory warnings about the supplied filter — for example filtering on a field with no payload index, which is matched by scanning. The search still runs. Omitted when there are none.
+	// FilterWarnings Advisory warnings about the supplied filter — for example filtering on a known field with no payload index, which is matched by scanning, or a collection excluded because it holds only open-access content and the filter asked for open_access=false. The search still runs. Omitted when there are none.
 	FilterWarnings *[]FilterWarning `json:"filterWarnings,omitempty"`
 
-	// JournalMetricExpansions What each journal-metric threshold (e.g. impactFactor >= 5) expanded to. Omitted when no metric filter was used.
+	// FiltersApplied The filters you sent, after validation. Omitted when no filters were sent.
+	FiltersApplied *map[string]interface{} `json:"filtersApplied,omitempty"`
+
+	// JournalMetricExpansions How each journal-metric condition resolved to ISSNs; omitted when no metric filter was used.
 	JournalMetricExpansions *[]JournalMetricExpansion `json:"journalMetricExpansions,omitempty"`
 
 	// QueryId Pass this to POST /search/unlock.
@@ -318,15 +324,19 @@ type SearchPreviewRequest struct {
 	//
 	// Flat (top-level keys are ANDed): `{"journal": "Nature", "publication_date": {"gte": "2020-01-01"}}`.
 	//
-	// Structured DSL (for OR / nesting): `{"and": [{"field": "journal", "eq": "Nature"}]}`. Operators: `eq`, `ne`, `in`, `not_in`, `gt`, `gte`, `lt`, `lte`, `between`. Combinators: `and`, `or`, `not`.
+	// Structured DSL (for OR / nesting): `{"and": [{"field": "journal", "eq": "Nature"}]}`. Operators: `eq`, `ne`, `in`, `not_in`, `gt`, `gte`, `lt`, `lte`, `between`. Combinators: `and`, `or`, `not`. One operator per condition, except range bounds (`gt`, `gte`, `lt`, `lte`) together; put other combinations in separate conditions under `and`.
 	//
-	// Exclusion uses `ne` / `not_in` / `not` — there is no separate syntax: `{"and": [{"field": "issn", "not_in": ["1234-5678"]}]}`.
+	// Mixing the flat and structured forms in one filter is rejected.
 	//
-	// Indexed on every collection (any other field is matched by scanning and returns a `filterWarnings` entry): `article_type`, `chapter_authors`, `chapter_number`, `chapter_title`, `doc_id`, `doi`, `isbn`, `issn`, `journal`, `keywords`, `license`, `open_access`, `publication_date`, `publisher`, `section`.
+	// Exclusion uses `ne` / `not_in` / `not` — there is no separate syntax: `{"and": [{"field": "issn", "not_in": ["1234-5679"]}]}`.
 	//
-	// Indexed on the editorial collections only (People Inc): `last_updated_date`, `medical_board_approved`, `topic`, `url`.
+	// Indexed on every collection (a field that is not a known result metadata field is rejected; a known field without an index, such as `pmid`, is matched by scanning and returns a `filterWarnings` entry, and is rejected on a collection that has no index for it): `article_type`, `chapter_authors`, `chapter_number`, `chapter_title`, `doi`, `isbn`, `issn`, `journal`, `keywords`, `open_access`, `publication_date`, `publisher`, `section`.
 	//
-	// `issn` accepts hyphenated or bare, upper- or lower-case X (`"1664-302X"`, `"1664302x"`). `doi` is matched case-insensitively and an optional `https://doi.org/` or `doi:` prefix is accepted.
+	// Indexed on the editorial collections only: `last_updated_date`, `medical_board_approved`, `topic`, `url`.
+	//
+	// `open_access` is also answered for a collection that holds only open-access content and carries no such field: `true` matches everything there, `false` (or the field under `or` / `not`) excludes that collection with a `filterWarnings` entry. `license` is returned in result metadata but is not filterable.
+	//
+	// `issn` accepts hyphenated or bare, upper- or lower-case X (`"1234-561X"`, `"1234561x"`). `doi` is matched case-insensitively and an optional `https://doi.org/` or `doi:` prefix is accepted.
 	//
 	// `journal_metric.2yr_mean_citedness`, `journal_metric.h_index` and `journal_metric.i10_index` accept range operators only and are resolved server-side into the matching ISSNs; see `journalMetricExpansions` in the response.
 	Filters *map[string]interface{} `json:"filters,omitempty"`
@@ -350,15 +360,19 @@ type SearchRequest struct {
 	//
 	// Flat (top-level keys are ANDed): `{"journal": "Nature", "publication_date": {"gte": "2020-01-01"}}`.
 	//
-	// Structured DSL (for OR / nesting): `{"and": [{"field": "journal", "eq": "Nature"}]}`. Operators: `eq`, `ne`, `in`, `not_in`, `gt`, `gte`, `lt`, `lte`, `between`. Combinators: `and`, `or`, `not`.
+	// Structured DSL (for OR / nesting): `{"and": [{"field": "journal", "eq": "Nature"}]}`. Operators: `eq`, `ne`, `in`, `not_in`, `gt`, `gte`, `lt`, `lte`, `between`. Combinators: `and`, `or`, `not`. One operator per condition, except range bounds (`gt`, `gte`, `lt`, `lte`) together; put other combinations in separate conditions under `and`.
 	//
-	// Exclusion uses `ne` / `not_in` / `not` — there is no separate syntax: `{"and": [{"field": "issn", "not_in": ["1234-5678"]}]}`.
+	// Mixing the flat and structured forms in one filter is rejected.
 	//
-	// Indexed on every collection (any other field is matched by scanning and returns a `filterWarnings` entry): `article_type`, `chapter_authors`, `chapter_number`, `chapter_title`, `doc_id`, `doi`, `isbn`, `issn`, `journal`, `keywords`, `license`, `open_access`, `publication_date`, `publisher`, `section`.
+	// Exclusion uses `ne` / `not_in` / `not` — there is no separate syntax: `{"and": [{"field": "issn", "not_in": ["1234-5679"]}]}`.
 	//
-	// Indexed on the editorial collections only (People Inc): `last_updated_date`, `medical_board_approved`, `topic`, `url`.
+	// Indexed on every collection (a field that is not a known result metadata field is rejected; a known field without an index, such as `pmid`, is matched by scanning and returns a `filterWarnings` entry, and is rejected on a collection that has no index for it): `article_type`, `chapter_authors`, `chapter_number`, `chapter_title`, `doi`, `isbn`, `issn`, `journal`, `keywords`, `open_access`, `publication_date`, `publisher`, `section`.
 	//
-	// `issn` accepts hyphenated or bare, upper- or lower-case X (`"1664-302X"`, `"1664302x"`). `doi` is matched case-insensitively and an optional `https://doi.org/` or `doi:` prefix is accepted.
+	// Indexed on the editorial collections only: `last_updated_date`, `medical_board_approved`, `topic`, `url`.
+	//
+	// `open_access` is also answered for a collection that holds only open-access content and carries no such field: `true` matches everything there, `false` (or the field under `or` / `not`) excludes that collection with a `filterWarnings` entry. `license` is returned in result metadata but is not filterable.
+	//
+	// `issn` accepts hyphenated or bare, upper- or lower-case X (`"1234-561X"`, `"1234561x"`). `doi` is matched case-insensitively and an optional `https://doi.org/` or `doi:` prefix is accepted.
 	//
 	// `journal_metric.2yr_mean_citedness`, `journal_metric.h_index` and `journal_metric.i10_index` accept range operators only and are resolved server-side into the matching ISSNs; see `journalMetricExpansions` in the response.
 	Filters *map[string]interface{} `json:"filters,omitempty"`
@@ -387,8 +401,11 @@ type SearchRequest struct {
 
 // SearchResponse defines model for SearchResponse.
 type SearchResponse struct {
-	// FilterWarnings Advisory warnings about the supplied filter — for example filtering on a field with no payload index, which is matched by scanning. The search still runs. Omitted when there are none.
+	// FilterWarnings Advisory warnings about the supplied filter — for example filtering on a known field with no payload index, which is matched by scanning, or a collection excluded because it holds only open-access content and the filter asked for open_access=false. The search still runs. Omitted when there are none.
 	FilterWarnings *[]FilterWarning `json:"filterWarnings,omitempty"`
+
+	// FiltersApplied The filters you sent, after validation. Omitted when no filters were sent.
+	FiltersApplied *map[string]interface{} `json:"filtersApplied,omitempty"`
 
 	// JournalMetricExpansions How each journal-metric condition resolved to ISSNs; omitted when no metric filter was used
 	JournalMetricExpansions *[]JournalMetricExpansion `json:"journalMetricExpansions,omitempty"`
@@ -420,7 +437,7 @@ type SearchResult struct {
 
 // SearchResultsPreviewResponse defines model for SearchResultsPreviewResponse.
 type SearchResultsPreviewResponse struct {
-	// FilterWarnings Advisory warnings about the supplied filter — for example filtering on a field with no payload index, which is matched by scanning. The search still runs. Omitted when there are none.
+	// FilterWarnings Advisory warnings about the supplied filter — for example filtering on a known field with no payload index, which is matched by scanning, or a collection excluded because it holds only open-access content and the filter asked for open_access=false. The search still runs. Omitted when there are none.
 	FilterWarnings *[]FilterWarning `json:"filterWarnings,omitempty"`
 
 	// JournalMetricExpansions How each journal-metric condition resolved to ISSNs; omitted when no metric filter was used
@@ -438,11 +455,38 @@ type SearchResultsPreviewResponse struct {
 
 // UnlockRequest defines model for UnlockRequest.
 type UnlockRequest struct {
+	// ImageMaxHeight Maximum image height in pixels
+	ImageMaxHeight *int `json:"imageMaxHeight,omitempty"`
+
+	// ImageMaxWidth Maximum image width in pixels
+	ImageMaxWidth *int `json:"imageMaxWidth,omitempty"`
+
+	// ImageQuality JPEG quality for fetched images
+	ImageQuality *int `json:"imageQuality,omitempty"`
+
+	// IncludeFigures Fetch figure images, returned as base64 in each result's metadata. Candidates are every result unlocked under this queryId, this call's and earlier calls' alike, but at most 50 images are fetched per call: the ids in resultIds — or, when it is omitted, the results this call unlocked — get that budget first, and figures past it come back as captions with no image_data. Ask again for the ids you still want; re-sending ids already unlocked charges nothing. Free — figures are not priced into the token cost, so this changes latency and response size, never the charge. Off by default: use the preview's figureCount to decide. includeImages is a deprecated alias.
+	IncludeFigures *bool `json:"includeFigures,omitempty"`
+
 	// QueryId The `queryId` from a previous POST /search/preview response.
 	QueryId string `json:"queryId"`
 
 	// ResultIds Result ids to unlock. Omit (or pass `null`) to unlock every result from the preview. Re-sending an id that is already unlocked costs nothing — only the delta is charged.
 	ResultIds *[]string `json:"resultIds,omitempty"`
+}
+
+// GetCachedResultParams defines parameters for GetCachedResult.
+type GetCachedResultParams struct {
+	// IncludeFigures Include figure images for results already unlocked. Free, like the rest of this endpoint: it re-delivers content that is already paid for and unlocks nothing. Applies to results that came from POST /api/v1/search/preview; a cached POST /api/v1/search/query response does not retain figures.
+	IncludeFigures *bool `form:"includeFigures,omitempty" json:"includeFigures,omitempty"`
+
+	// ImageMaxWidth Maximum image width in pixels.
+	ImageMaxWidth *int `form:"imageMaxWidth,omitempty" json:"imageMaxWidth,omitempty"`
+
+	// ImageMaxHeight Maximum image height in pixels.
+	ImageMaxHeight *int `form:"imageMaxHeight,omitempty" json:"imageMaxHeight,omitempty"`
+
+	// ImageQuality JPEG quality for fetched images.
+	ImageQuality *int `form:"imageQuality,omitempty" json:"imageQuality,omitempty"`
 }
 
 // SearchCollectionJSONBody defines parameters for SearchCollection.
@@ -451,15 +495,19 @@ type SearchCollectionJSONBody struct {
 	//
 	// Flat (top-level keys are ANDed): `{"journal": "Nature", "publication_date": {"gte": "2020-01-01"}}`.
 	//
-	// Structured DSL (for OR / nesting): `{"and": [{"field": "journal", "eq": "Nature"}]}`. Operators: `eq`, `ne`, `in`, `not_in`, `gt`, `gte`, `lt`, `lte`, `between`. Combinators: `and`, `or`, `not`.
+	// Structured DSL (for OR / nesting): `{"and": [{"field": "journal", "eq": "Nature"}]}`. Operators: `eq`, `ne`, `in`, `not_in`, `gt`, `gte`, `lt`, `lte`, `between`. Combinators: `and`, `or`, `not`. One operator per condition, except range bounds (`gt`, `gte`, `lt`, `lte`) together; put other combinations in separate conditions under `and`.
 	//
-	// Exclusion uses `ne` / `not_in` / `not` — there is no separate syntax: `{"and": [{"field": "issn", "not_in": ["1234-5678"]}]}`.
+	// Mixing the flat and structured forms in one filter is rejected.
 	//
-	// Indexed on every collection (any other field is matched by scanning and returns a `filterWarnings` entry): `article_type`, `chapter_authors`, `chapter_number`, `chapter_title`, `doc_id`, `doi`, `isbn`, `issn`, `journal`, `keywords`, `license`, `open_access`, `publication_date`, `publisher`, `section`.
+	// Exclusion uses `ne` / `not_in` / `not` — there is no separate syntax: `{"and": [{"field": "issn", "not_in": ["1234-5679"]}]}`.
 	//
-	// Indexed on the editorial collections only (People Inc): `last_updated_date`, `medical_board_approved`, `topic`, `url`.
+	// Indexed on every collection (a field that is not a known result metadata field is rejected; a known field without an index, such as `pmid`, is matched by scanning and returns a `filterWarnings` entry, and is rejected on a collection that has no index for it): `article_type`, `chapter_authors`, `chapter_number`, `chapter_title`, `doi`, `isbn`, `issn`, `journal`, `keywords`, `open_access`, `publication_date`, `publisher`, `section`.
 	//
-	// `issn` accepts hyphenated or bare, upper- or lower-case X (`"1664-302X"`, `"1664302x"`). `doi` is matched case-insensitively and an optional `https://doi.org/` or `doi:` prefix is accepted.
+	// Indexed on the editorial collections only: `last_updated_date`, `medical_board_approved`, `topic`, `url`.
+	//
+	// `open_access` is also answered for a collection that holds only open-access content and carries no such field: `true` matches everything there, `false` (or the field under `or` / `not`) excludes that collection with a `filterWarnings` entry. `license` is returned in result metadata but is not filterable.
+	//
+	// `issn` accepts hyphenated or bare, upper- or lower-case X (`"1234-561X"`, `"1234561x"`). `doi` is matched case-insensitively and an optional `https://doi.org/` or `doi:` prefix is accepted.
 	//
 	// `journal_metric.2yr_mean_citedness`, `journal_metric.h_index` and `journal_metric.i10_index` accept range operators only and are resolved server-side into the matching ISSNs; see `journalMetricExpansions` in the response.
 	Filters *map[string]interface{} `json:"filters,omitempty"`
@@ -662,11 +710,13 @@ type ClientInterface interface {
 	// Each result carries `locked`/`tokens`/`cost`: a result not yet paid for through POST /api/v1/search/unlock comes back as a teaser (`locked: true`), never the full text.
 	//
 	// Corresponds with GET /api/v1/search/results/{queryId} (the `GetCachedResult` operationId).
-	GetCachedResult(ctx context.Context, queryId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+	GetCachedResult(ctx context.Context, queryId string, params *GetCachedResultParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SearchUnlockWithBody Pay for previewed results and receive them in full
 	//
 	// Charges only for results not already unlocked by an earlier call against the same `queryId` -- re-sending the same ids costs nothing. Omit `resultIds` (or pass `null`) to unlock everything from the preview.
+	//
+	// Set `includeFigures` to receive figure images as base64 in `metadata.figures[].image_data`. Images are returned for every result unlocked under this `queryId`, including ones unlocked by an earlier call -- so re-sending ids you have already paid for is how you fetch images you skipped the first time, and it charges nothing. At most 50 images are fetched per call; the ids in `resultIds` (or, when it is omitted, the results this call unlocked) get that budget first. Figures are free: they are not priced into the token cost, so the flag changes latency and response size and never the charge. Use the preview's `figureCount` to decide whether to ask.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -676,6 +726,8 @@ type ClientInterface interface {
 	// SearchUnlock Pay for previewed results and receive them in full
 	//
 	// Charges only for results not already unlocked by an earlier call against the same `queryId` -- re-sending the same ids costs nothing. Omit `resultIds` (or pass `null`) to unlock everything from the preview.
+	//
+	// Set `includeFigures` to receive figure images as base64 in `metadata.figures[].image_data`. Images are returned for every result unlocked under this `queryId`, including ones unlocked by an earlier call -- so re-sending ids you have already paid for is how you fetch images you skipped the first time, and it charges nothing. At most 50 images are fetched per call; the ids in `resultIds` (or, when it is omitted, the results this call unlocked) get that budget first. Figures are free: they are not priced into the token cost, so the flag changes latency and response size and never the charge. Use the preview's `figureCount` to decide whether to ask.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -868,8 +920,8 @@ func (c *Client) GetQuota(ctx context.Context, reqEditors ...RequestEditorFn) (*
 // Each result carries `locked`/`tokens`/`cost`: a result not yet paid for through POST /api/v1/search/unlock comes back as a teaser (`locked: true`), never the full text.
 //
 // Corresponds with GET /api/v1/search/results/{queryId} (the `GetCachedResult` operationId).
-func (c *Client) GetCachedResult(ctx context.Context, queryId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetCachedResultRequest(c.Server, queryId)
+func (c *Client) GetCachedResult(ctx context.Context, queryId string, params *GetCachedResultParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetCachedResultRequest(c.Server, queryId, params)
 	if err != nil {
 		return nil, err
 	}
@@ -883,6 +935,8 @@ func (c *Client) GetCachedResult(ctx context.Context, queryId string, reqEditors
 // SearchUnlockWithBody Pay for previewed results and receive them in full
 //
 // Charges only for results not already unlocked by an earlier call against the same `queryId` -- re-sending the same ids costs nothing. Omit `resultIds` (or pass `null`) to unlock everything from the preview.
+//
+// Set `includeFigures` to receive figure images as base64 in `metadata.figures[].image_data`. Images are returned for every result unlocked under this `queryId`, including ones unlocked by an earlier call -- so re-sending ids you have already paid for is how you fetch images you skipped the first time, and it charges nothing. At most 50 images are fetched per call; the ids in `resultIds` (or, when it is omitted, the results this call unlocked) get that budget first. Figures are free: they are not priced into the token cost, so the flag changes latency and response size and never the charge. Use the preview's `figureCount` to decide whether to ask.
 //
 // Takes any type of body and a specified content type.
 //
@@ -902,6 +956,8 @@ func (c *Client) SearchUnlockWithBody(ctx context.Context, contentType string, b
 // SearchUnlock Pay for previewed results and receive them in full
 //
 // Charges only for results not already unlocked by an earlier call against the same `queryId` -- re-sending the same ids costs nothing. Omit `resultIds` (or pass `null`) to unlock everything from the preview.
+//
+// Set `includeFigures` to receive figure images as base64 in `metadata.figures[].image_data`. Images are returned for every result unlocked under this `queryId`, including ones unlocked by an earlier call -- so re-sending ids you have already paid for is how you fetch images you skipped the first time, and it charges nothing. At most 50 images are fetched per call; the ids in `resultIds` (or, when it is omitted, the results this call unlocked) get that budget first. Figures are free: they are not priced into the token cost, so the flag changes latency and response size and never the charge. Use the preview's `figureCount` to decide whether to ask.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -1131,7 +1187,7 @@ func NewGetQuotaRequest(server string) (*http.Request, error) {
 }
 
 // NewGetCachedResultRequest constructs an http.Request for the GetCachedResult method
-func NewGetCachedResultRequest(server string, queryId string) (*http.Request, error) {
+func NewGetCachedResultRequest(server string, queryId string, params *GetCachedResultParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -1154,6 +1210,69 @@ func NewGetCachedResultRequest(server string, queryId string) (*http.Request, er
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.IncludeFigures != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "includeFigures", *params.IncludeFigures, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.ImageMaxWidth != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "imageMaxWidth", *params.ImageMaxWidth, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.ImageMaxHeight != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "imageMaxHeight", *params.ImageMaxHeight, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.ImageQuality != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "imageQuality", *params.ImageQuality, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
 	}
 
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
@@ -1388,11 +1507,13 @@ type ClientWithResponsesInterface interface {
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /api/v1/search/results/{queryId} (the `GetCachedResult` operationId).
-	GetCachedResultWithResponse(ctx context.Context, queryId string, reqEditors ...RequestEditorFn) (*GetCachedResultResponse, error)
+	GetCachedResultWithResponse(ctx context.Context, queryId string, params *GetCachedResultParams, reqEditors ...RequestEditorFn) (*GetCachedResultResponse, error)
 
 	// SearchUnlockWithBodyWithResponse Pay for previewed results and receive them in full
 	//
 	// Charges only for results not already unlocked by an earlier call against the same `queryId` -- re-sending the same ids costs nothing. Omit `resultIds` (or pass `null`) to unlock everything from the preview.
+	//
+	// Set `includeFigures` to receive figure images as base64 in `metadata.figures[].image_data`. Images are returned for every result unlocked under this `queryId`, including ones unlocked by an earlier call -- so re-sending ids you have already paid for is how you fetch images you skipped the first time, and it charges nothing. At most 50 images are fetched per call; the ids in `resultIds` (or, when it is omitted, the results this call unlocked) get that budget first. Figures are free: they are not priced into the token cost, so the flag changes latency and response size and never the charge. Use the preview's `figureCount` to decide whether to ask.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -1402,6 +1523,8 @@ type ClientWithResponsesInterface interface {
 	// SearchUnlockWithResponse Pay for previewed results and receive them in full
 	//
 	// Charges only for results not already unlocked by an earlier call against the same `queryId` -- re-sending the same ids costs nothing. Omit `resultIds` (or pass `null`) to unlock everything from the preview.
+	//
+	// Set `includeFigures` to receive figure images as base64 in `metadata.figures[].image_data`. Images are returned for every result unlocked under this `queryId`, including ones unlocked by an earlier call -- so re-sending ids you have already paid for is how you fetch images you skipped the first time, and it charges nothing. At most 50 images are fetched per call; the ids in `resultIds` (or, when it is omitted, the results this call unlocked) get that budget first. Figures are free: they are not priced into the token cost, so the flag changes latency and response size and never the charge. Use the preview's `figureCount` to decide whether to ask.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2204,8 +2327,8 @@ func (c *ClientWithResponses) GetQuotaWithResponse(ctx context.Context, reqEdito
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with GET /api/v1/search/results/{queryId} (the `GetCachedResult` operationId).
-func (c *ClientWithResponses) GetCachedResultWithResponse(ctx context.Context, queryId string, reqEditors ...RequestEditorFn) (*GetCachedResultResponse, error) {
-	rsp, err := c.GetCachedResult(ctx, queryId, reqEditors...)
+func (c *ClientWithResponses) GetCachedResultWithResponse(ctx context.Context, queryId string, params *GetCachedResultParams, reqEditors ...RequestEditorFn) (*GetCachedResultResponse, error) {
+	rsp, err := c.GetCachedResult(ctx, queryId, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -2215,6 +2338,8 @@ func (c *ClientWithResponses) GetCachedResultWithResponse(ctx context.Context, q
 // SearchUnlockWithBodyWithResponse Pay for previewed results and receive them in full
 //
 // Charges only for results not already unlocked by an earlier call against the same `queryId` -- re-sending the same ids costs nothing. Omit `resultIds` (or pass `null`) to unlock everything from the preview.
+//
+// Set `includeFigures` to receive figure images as base64 in `metadata.figures[].image_data`. Images are returned for every result unlocked under this `queryId`, including ones unlocked by an earlier call -- so re-sending ids you have already paid for is how you fetch images you skipped the first time, and it charges nothing. At most 50 images are fetched per call; the ids in `resultIds` (or, when it is omitted, the results this call unlocked) get that budget first. Figures are free: they are not priced into the token cost, so the flag changes latency and response size and never the charge. Use the preview's `figureCount` to decide whether to ask.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -2230,6 +2355,8 @@ func (c *ClientWithResponses) SearchUnlockWithBodyWithResponse(ctx context.Conte
 // SearchUnlockWithResponse Pay for previewed results and receive them in full
 //
 // Charges only for results not already unlocked by an earlier call against the same `queryId` -- re-sending the same ids costs nothing. Omit `resultIds` (or pass `null`) to unlock everything from the preview.
+//
+// Set `includeFigures` to receive figure images as base64 in `metadata.figures[].image_data`. Images are returned for every result unlocked under this `queryId`, including ones unlocked by an earlier call -- so re-sending ids you have already paid for is how you fetch images you skipped the first time, and it charges nothing. At most 50 images are fetched per call; the ids in `resultIds` (or, when it is omitted, the results this call unlocked) get that budget first. Figures are free: they are not priced into the token cost, so the flag changes latency and response size and never the charge. Use the preview's `figureCount` to decide whether to ask.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //

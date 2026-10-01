@@ -354,7 +354,8 @@ func (c *Redpine) Unlock(ctx context.Context, queryID string, resultIDs []string
 
 func (c *Redpine) GetResults(ctx context.Context, queryID string) (*SearchResultsPreviewResponse, error) {
 	raw, err := c.call(ctx, func() (*http.Response, []byte, error) {
-		r, err := c.gen.GetCachedResultWithResponse(ctx, queryID)
+		// Image options aren't exposed on GetResults yet (matches Unlock, matches TS); nil omits them all.
+		r, err := c.gen.GetCachedResultWithResponse(ctx, queryID, nil)
 		if err != nil {
 			return nil, nil, err
 		}

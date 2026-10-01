@@ -4,7 +4,7 @@
   "request": {"method": "GET", "path": "/api/v1/search/results/q-2", "body": null},
   "response": {"status": 200, "headers": {},
                "body": {"queryId": "q-2", "latencyMs": 0,
-                        "results": [{"id": "r1", "text": "full chunk", "locked": false, "collection": "corpus", "metadata": {"title": "T"}},
-                                    {"id": "r2", "text": "teaser...", "locked": true, "tokens": 120, "cost": "0.120000"}]}},
+                        "results": [{"id": "r1", "text": "full chunk", "locked": false, "figureCount": 0, "collection": "corpus", "metadata": {"title": "T"}},
+                                    {"id": "r2", "text": "teaser...", "locked": true, "figureCount": 0, "tokens": 120, "cost": "0.120000"}]}},
   "expect": {"error": null, "field": "queryId", "value": "q-2"}
 }

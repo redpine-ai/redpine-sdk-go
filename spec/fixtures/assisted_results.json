@@ -1,10 +1,10 @@
 {
   "op": "assisted_search",
   "args": {"query": "why", "collection": "corpus", "allow_clarification": false,
-           "filters": {"and": [{"field": "issn", "not_in": ["1234-5678"]}]}},
+           "filters": {"and": [{"field": "issn", "not_in": ["1234-5679"]}]}},
   "request": {"method": "POST", "path": "/api/v1/search/assisted",
               "body": {"query": "why", "collection": "corpus", "limit": 10,
-                       "filters": {"and": [{"field": "issn", "not_in": ["1234-5678"]}]},
+                       "filters": {"and": [{"field": "issn", "not_in": ["1234-5679"]}]},
                        "allowClarification": false, "includeMetadata": true, "includeFigures": false,
                        "imageMaxHeight": 600, "imageMaxWidth": 800, "imageQuality": 75}},
   "response": {"status": 200, "headers": {},
