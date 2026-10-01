@@ -320,7 +320,8 @@ func (c *Redpine) Preview(ctx context.Context, query string, o PreviewOptions) (
 	lim := limitOr(o.Limit)
 	body.Limit, body.Filters = &lim, filters
 	raw, err := c.call(ctx, func() (*http.Response, []byte, error) {
-		r, err := c.gen.SearchPreviewWithResponse(ctx, body)
+		// Idempotency-Key isn't exposed on Preview yet (matches Python/TS); nil omits the header.
+		r, err := c.gen.SearchPreviewWithResponse(ctx, nil, body)
 		if err != nil {
 			return nil, nil, err
 		}

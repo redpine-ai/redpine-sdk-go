@@ -338,7 +338,7 @@ type SearchPreviewRequest struct {
 	//
 	// `issn` accepts hyphenated or bare, upper- or lower-case X (`"1234-561X"`, `"1234561x"`). `doi` is matched case-insensitively and an optional `https://doi.org/` or `doi:` prefix is accepted.
 	//
-	// `journal_metric.2yr_mean_citedness`, `journal_metric.h_index` and `journal_metric.i10_index` accept range operators only and are resolved server-side into the matching ISSNs; see `journalMetricExpansions` in the response.
+	// `journal_metric.2yr_mean_citedness`, `journal_metric.h_index`, `journal_metric.i10_index` and `journal_metric.impact_factor` accept range operators only and are resolved server-side into the matching ISSNs; see `journalMetricExpansions` in the response. `impact_factor` is an impact factor computed by Redpine from OpenAlex citation data with the JIF formula. It is not Clarivate's Journal Impact Factor. Journals that publish many news items, letters and editorials (for example BMJ, JAMA, The Lancet) score far below their JCR figure, because OpenAlex classifies those items as articles. A metric condition may match at most 35,000 journal ISSNs and a request may send at most 70,000 filter values. A threshold with one end must stay within its documented bound: journal_metric.2yr_mean_citedness: gte 1.1 or higher, or lte 0.0 or lower; journal_metric.h_index: gte 35 or higher, or lte 3 or lower; journal_metric.i10_index: gte 160 or higher (no upper bound alone); journal_metric.impact_factor: gte 0.9 or higher, or lte 0.2 or lower. On h_index and i10_index, gt N counts as gte N+1 and lt N as lte N-1. A range with both ends (gte with lte, or between) may sit anywhere if it matches no more than 35,000 ISSNs. For 'below X' use not with gte X, X at or above the metric's minimum; not also keeps documents with no journal metric, and on impact_factor journals with no impact_factor. Two conditions near their bounds use most of the 70,000 values, so a third, or a long in/not_in list beside them, can be refused.
 	Filters *map[string]interface{} `json:"filters,omitempty"`
 
 	// Limit Maximum results to return (default 10, max 30)
@@ -374,7 +374,7 @@ type SearchRequest struct {
 	//
 	// `issn` accepts hyphenated or bare, upper- or lower-case X (`"1234-561X"`, `"1234561x"`). `doi` is matched case-insensitively and an optional `https://doi.org/` or `doi:` prefix is accepted.
 	//
-	// `journal_metric.2yr_mean_citedness`, `journal_metric.h_index` and `journal_metric.i10_index` accept range operators only and are resolved server-side into the matching ISSNs; see `journalMetricExpansions` in the response.
+	// `journal_metric.2yr_mean_citedness`, `journal_metric.h_index`, `journal_metric.i10_index` and `journal_metric.impact_factor` accept range operators only and are resolved server-side into the matching ISSNs; see `journalMetricExpansions` in the response. `impact_factor` is an impact factor computed by Redpine from OpenAlex citation data with the JIF formula. It is not Clarivate's Journal Impact Factor. Journals that publish many news items, letters and editorials (for example BMJ, JAMA, The Lancet) score far below their JCR figure, because OpenAlex classifies those items as articles. A metric condition may match at most 35,000 journal ISSNs and a request may send at most 70,000 filter values. A threshold with one end must stay within its documented bound: journal_metric.2yr_mean_citedness: gte 1.1 or higher, or lte 0.0 or lower; journal_metric.h_index: gte 35 or higher, or lte 3 or lower; journal_metric.i10_index: gte 160 or higher (no upper bound alone); journal_metric.impact_factor: gte 0.9 or higher, or lte 0.2 or lower. On h_index and i10_index, gt N counts as gte N+1 and lt N as lte N-1. A range with both ends (gte with lte, or between) may sit anywhere if it matches no more than 35,000 ISSNs. For 'below X' use not with gte X, X at or above the metric's minimum; not also keeps documents with no journal metric, and on impact_factor journals with no impact_factor. Two conditions near their bounds use most of the 70,000 values, so a third, or a long in/not_in list beside them, can be refused.
 	Filters *map[string]interface{} `json:"filters,omitempty"`
 
 	// ImageMaxHeight Maximum image height in pixels
@@ -474,6 +474,12 @@ type UnlockRequest struct {
 	ResultIds *[]string `json:"resultIds,omitempty"`
 }
 
+// SearchPreviewParams defines parameters for SearchPreview.
+type SearchPreviewParams struct {
+	// IdempotencyKey Optional, 1-255 characters, scoped to your organization and kept for 24 hours. A repeat with the same key and the same body runs no new search: it returns the original `queryId`, rendered through the unlock ledger, so rows already unlocked come back in full with `locked: false`. Every row keeps its `cost` and `tokens`. The same key with a different body is a 422 `IDEMPOTENCY_KEY_REUSED`. A repeat while the first request is still running is a 409 `IDEMPOTENCY_KEY_IN_PROGRESS`, so retry it. If the original preview has expired, the request runs a new preview and the key moves to it. The response says which happened in `Idempotency-Status`.
+	IdempotencyKey *string `json:"Idempotency-Key,omitempty"`
+}
+
 // GetCachedResultParams defines parameters for GetCachedResult.
 type GetCachedResultParams struct {
 	// IncludeFigures Include figure images for results already unlocked. Free, like the rest of this endpoint: it re-delivers content that is already paid for and unlocks nothing. Applies to results that came from POST /api/v1/search/preview; a cached POST /api/v1/search/query response does not retain figures.
@@ -509,7 +515,7 @@ type SearchCollectionJSONBody struct {
 	//
 	// `issn` accepts hyphenated or bare, upper- or lower-case X (`"1234-561X"`, `"1234561x"`). `doi` is matched case-insensitively and an optional `https://doi.org/` or `doi:` prefix is accepted.
 	//
-	// `journal_metric.2yr_mean_citedness`, `journal_metric.h_index` and `journal_metric.i10_index` accept range operators only and are resolved server-side into the matching ISSNs; see `journalMetricExpansions` in the response.
+	// `journal_metric.2yr_mean_citedness`, `journal_metric.h_index`, `journal_metric.i10_index` and `journal_metric.impact_factor` accept range operators only and are resolved server-side into the matching ISSNs; see `journalMetricExpansions` in the response. `impact_factor` is an impact factor computed by Redpine from OpenAlex citation data with the JIF formula. It is not Clarivate's Journal Impact Factor. Journals that publish many news items, letters and editorials (for example BMJ, JAMA, The Lancet) score far below their JCR figure, because OpenAlex classifies those items as articles. A metric condition may match at most 35,000 journal ISSNs and a request may send at most 70,000 filter values. A threshold with one end must stay within its documented bound: journal_metric.2yr_mean_citedness: gte 1.1 or higher, or lte 0.0 or lower; journal_metric.h_index: gte 35 or higher, or lte 3 or lower; journal_metric.i10_index: gte 160 or higher (no upper bound alone); journal_metric.impact_factor: gte 0.9 or higher, or lte 0.2 or lower. On h_index and i10_index, gt N counts as gte N+1 and lt N as lte N-1. A range with both ends (gte with lte, or between) may sit anywhere if it matches no more than 35,000 ISSNs. For 'below X' use not with gte X, X at or above the metric's minimum; not also keeps documents with no journal metric, and on impact_factor journals with no impact_factor. Two conditions near their bounds use most of the 70,000 values, so a third, or a long in/not_in list beside them, can be refused.
 	Filters *map[string]interface{} `json:"filters,omitempty"`
 
 	// ImageMaxHeight Maximum image height in pixels
@@ -662,10 +668,12 @@ type ClientInterface interface {
 	//
 	// Call POST /api/v1/search/unlock with the returned `queryId` to pay for and receive some or all of the results in full.
 	//
+	// Send an `Idempotency-Key` header to make retries safe: a repeat with the same key and body returns the original `queryId` instead of buying the same results again under a new one.
+	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /api/v1/search/preview (the `SearchPreview` operationId).
-	SearchPreviewWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	SearchPreviewWithBody(ctx context.Context, params *SearchPreviewParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SearchPreview Preview search results without charging
 	//
@@ -673,10 +681,12 @@ type ClientInterface interface {
 	//
 	// Call POST /api/v1/search/unlock with the returned `queryId` to pay for and receive some or all of the results in full.
 	//
+	// Send an `Idempotency-Key` header to make retries safe: a repeat with the same key and body returns the original `queryId` instead of buying the same results again under a new one.
+	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with POST /api/v1/search/preview (the `SearchPreview` operationId).
-	SearchPreview(ctx context.Context, body SearchPreviewJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	SearchPreview(ctx context.Context, params *SearchPreviewParams, body SearchPreviewJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SearchQueryWithBody Search documents
 	//
@@ -822,11 +832,13 @@ func (c *Client) ListCollections(ctx context.Context, reqEditors ...RequestEdito
 //
 // Call POST /api/v1/search/unlock with the returned `queryId` to pay for and receive some or all of the results in full.
 //
+// Send an `Idempotency-Key` header to make retries safe: a repeat with the same key and body returns the original `queryId` instead of buying the same results again under a new one.
+//
 // Takes any type of body and a specified content type.
 //
 // Corresponds with POST /api/v1/search/preview (the `SearchPreview` operationId).
-func (c *Client) SearchPreviewWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSearchPreviewRequestWithBody(c.Server, contentType, body)
+func (c *Client) SearchPreviewWithBody(ctx context.Context, params *SearchPreviewParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSearchPreviewRequestWithBody(c.Server, params, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -843,11 +855,13 @@ func (c *Client) SearchPreviewWithBody(ctx context.Context, contentType string, 
 //
 // Call POST /api/v1/search/unlock with the returned `queryId` to pay for and receive some or all of the results in full.
 //
+// Send an `Idempotency-Key` header to make retries safe: a repeat with the same key and body returns the original `queryId` instead of buying the same results again under a new one.
+//
 // Takes a body of the `application/json` content type.
 //
 // Corresponds with POST /api/v1/search/preview (the `SearchPreview` operationId).
-func (c *Client) SearchPreview(ctx context.Context, body SearchPreviewJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSearchPreviewRequest(c.Server, body)
+func (c *Client) SearchPreview(ctx context.Context, params *SearchPreviewParams, body SearchPreviewJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSearchPreviewRequest(c.Server, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -1080,18 +1094,18 @@ func NewListCollectionsRequest(server string) (*http.Request, error) {
 }
 
 // NewSearchPreviewRequest calls the generic SearchPreview builder with application/json body
-func NewSearchPreviewRequest(server string, body SearchPreviewJSONRequestBody) (*http.Request, error) {
+func NewSearchPreviewRequest(server string, params *SearchPreviewParams, body SearchPreviewJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewSearchPreviewRequestWithBody(server, "application/json", bodyReader)
+	return NewSearchPreviewRequestWithBody(server, params, "application/json", bodyReader)
 }
 
 // NewSearchPreviewRequestWithBody constructs an http.Request for the SearchPreview method, with any body, and a specified content type
-func NewSearchPreviewRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+func NewSearchPreviewRequestWithBody(server string, params *SearchPreviewParams, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -1115,6 +1129,21 @@ func NewSearchPreviewRequestWithBody(server string, contentType string, body io.
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
 
 	return req, nil
 }
@@ -1455,10 +1484,12 @@ type ClientWithResponsesInterface interface {
 	//
 	// Call POST /api/v1/search/unlock with the returned `queryId` to pay for and receive some or all of the results in full.
 	//
+	// Send an `Idempotency-Key` header to make retries safe: a repeat with the same key and body returns the original `queryId` instead of buying the same results again under a new one.
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /api/v1/search/preview (the `SearchPreview` operationId).
-	SearchPreviewWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SearchPreviewResponse, error)
+	SearchPreviewWithBodyWithResponse(ctx context.Context, params *SearchPreviewParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SearchPreviewResponse, error)
 
 	// SearchPreviewWithResponse Preview search results without charging
 	//
@@ -1466,10 +1497,12 @@ type ClientWithResponsesInterface interface {
 	//
 	// Call POST /api/v1/search/unlock with the returned `queryId` to pay for and receive some or all of the results in full.
 	//
+	// Send an `Idempotency-Key` header to make retries safe: a repeat with the same key and body returns the original `queryId` instead of buying the same results again under a new one.
+	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /api/v1/search/preview (the `SearchPreview` operationId).
-	SearchPreviewWithResponse(ctx context.Context, body SearchPreviewJSONRequestBody, reqEditors ...RequestEditorFn) (*SearchPreviewResponse, error)
+	SearchPreviewWithResponse(ctx context.Context, params *SearchPreviewParams, body SearchPreviewJSONRequestBody, reqEditors ...RequestEditorFn) (*SearchPreviewResponse, error)
 
 	// SearchQueryWithBodyWithResponse Search documents
 	//
@@ -1701,6 +1734,11 @@ func (r ListCollectionsResponse) ContentType() string {
 	return ""
 }
 
+// SearchPreviewResponse200Headers the declared response headers of an HTTP 200 response for SearchPreview
+type SearchPreviewResponse200Headers struct {
+	IdempotencyStatus *string
+}
+
 type SearchPreviewResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -1712,12 +1750,16 @@ type SearchPreviewResponse struct {
 	JSON403 *Error
 	// JSON404 the response for an HTTP 404 `application/json` response
 	JSON404 *Error
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Error
 	// JSON422 the response for an HTTP 422 `application/json` response
 	JSON422 *Error
 	// JSON429 the response for an HTTP 429 `application/json` response
 	JSON429 *Error
 	// JSON503 the response for an HTTP 503 `application/json` response
 	JSON503 *Error
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *SearchPreviewResponse200Headers
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -1738,6 +1780,11 @@ func (r SearchPreviewResponse) GetJSON403() *Error {
 // GetJSON404 returns the response for an HTTP 404 `application/json` response
 func (r SearchPreviewResponse) GetJSON404() *Error {
 	return r.JSON404
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r SearchPreviewResponse) GetJSON409() *Error {
+	return r.JSON409
 }
 
 // GetJSON422 returns the response for an HTTP 422 `application/json` response
@@ -2245,11 +2292,13 @@ func (c *ClientWithResponses) ListCollectionsWithResponse(ctx context.Context, r
 //
 // Call POST /api/v1/search/unlock with the returned `queryId` to pay for and receive some or all of the results in full.
 //
+// Send an `Idempotency-Key` header to make retries safe: a repeat with the same key and body returns the original `queryId` instead of buying the same results again under a new one.
+//
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /api/v1/search/preview (the `SearchPreview` operationId).
-func (c *ClientWithResponses) SearchPreviewWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SearchPreviewResponse, error) {
-	rsp, err := c.SearchPreviewWithBody(ctx, contentType, body, reqEditors...)
+func (c *ClientWithResponses) SearchPreviewWithBodyWithResponse(ctx context.Context, params *SearchPreviewParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SearchPreviewResponse, error) {
+	rsp, err := c.SearchPreviewWithBody(ctx, params, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -2262,11 +2311,13 @@ func (c *ClientWithResponses) SearchPreviewWithBodyWithResponse(ctx context.Cont
 //
 // Call POST /api/v1/search/unlock with the returned `queryId` to pay for and receive some or all of the results in full.
 //
+// Send an `Idempotency-Key` header to make retries safe: a repeat with the same key and body returns the original `queryId` instead of buying the same results again under a new one.
+//
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /api/v1/search/preview (the `SearchPreview` operationId).
-func (c *ClientWithResponses) SearchPreviewWithResponse(ctx context.Context, body SearchPreviewJSONRequestBody, reqEditors ...RequestEditorFn) (*SearchPreviewResponse, error) {
-	rsp, err := c.SearchPreview(ctx, body, reqEditors...)
+func (c *ClientWithResponses) SearchPreviewWithResponse(ctx context.Context, params *SearchPreviewParams, body SearchPreviewJSONRequestBody, reqEditors ...RequestEditorFn) (*SearchPreviewResponse, error) {
+	rsp, err := c.SearchPreview(ctx, params, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -2604,6 +2655,13 @@ func ParseSearchPreviewResponse(rsp *http.Response) (*SearchPreviewResponse, err
 		}
 		response.JSON404 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -2625,6 +2683,19 @@ func ParseSearchPreviewResponse(rsp *http.Response) (*SearchPreviewResponse, err
 		}
 		response.JSON503 = &dest
 
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers SearchPreviewResponse200Headers
+		if values := rsp.Header.Values("Idempotency-Status"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Idempotency-Status", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.IdempotencyStatus = &value
+		}
+		response.Headers200 = &headers
 	}
 
 	return response, nil
