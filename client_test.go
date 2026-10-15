@@ -244,3 +244,41 @@ func TestErrorsAndRetries(t *testing.T) {
 		}
 	})
 }
+
+func httpTimeout(t *testing.T, g *ClientWithResponses) time.Duration {
+	t.Helper()
+	return g.ClientInterface.(*Client).Client.(*http.Client).Timeout
+}
+
+func TestAssistedSearchWaitsLongerByDefault(t *testing.T) {
+	c, err := New(WithAPIKey(key))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := httpTimeout(t, c.gen); got != DefaultTimeout {
+		t.Fatalf("default timeout %v, want %v", got, DefaultTimeout)
+	}
+	if got := httpTimeout(t, c.assisted); got != AssistedTimeout {
+		t.Fatalf("assisted timeout %v, want %v", got, AssistedTimeout)
+	}
+}
+
+func TestExplicitTimeoutAppliesToAssistedSearch(t *testing.T) {
+	c, err := New(WithAPIKey(key), WithTimeout(10*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.assisted != c.gen || httpTimeout(t, c.assisted) != 10*time.Second {
+		t.Fatalf("assisted search must use the caller's timeout")
+	}
+}
+
+func TestWithTimeoutZeroStillMeansNoTimeout(t *testing.T) {
+	c, err := New(WithAPIKey(key), WithTimeout(0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.assisted != c.gen || httpTimeout(t, c.assisted) != 0 {
+		t.Fatalf("WithTimeout(0) must leave every call without a timeout")
+	}
+}

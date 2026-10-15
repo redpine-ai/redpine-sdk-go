@@ -95,8 +95,8 @@
                         "type": "integer"
                     },
                     "query": {
-                        "description": "Search query text",
-                        "maxLength": 1000,
+                        "description": "Search query text, or a whole document such as a patient case or chart note (max 16000 characters)",
+                        "maxLength": 16000,
                         "minLength": 1,
                         "type": "string"
                     }
@@ -122,6 +122,17 @@
                             }
                         ],
                         "description": "Set only when status is `clarification_needed`."
+                    },
+                    "discovery": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/DiscoveryAnswer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "A catalogue answer: what data sources, publishers or journals your key can reach. Present only when the query asked about the catalogue rather than for literature; then `results` is empty and nothing was charged (`X-Query-Cost: 0.000000`)."
                     },
                     "filterWarnings": {
                         "default": null,
@@ -231,6 +242,14 @@
                             "null"
                         ]
                     },
+                    "subQuestion": {
+                        "default": null,
+                        "description": "The sub-question of a multi-problem query that this result answers; null when the query was answered as a single question",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
                     "text": {
                         "description": "Chunk text content",
                         "type": "string"
@@ -291,6 +310,397 @@
                 "required": [
                     "collections",
                     "count"
+                ],
+                "type": "object"
+            },
+            "DiscoveryAnswer": {
+                "description": "A catalogue answer: what data sources, publishers or journals your key can reach. Present only when the query asked about the catalogue rather than for literature; then `results` is empty and nothing was charged (`X-Query-Cost: 0.000000`).",
+                "properties": {
+                    "callout": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/DiscoveryCallout"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Set when there is a notice (today: add a payment method to unlock licensed journals)."
+                    },
+                    "intent": {
+                        "description": "Which catalogue question was answered",
+                        "enum": [
+                            "sources",
+                            "publishers",
+                            "journals"
+                        ],
+                        "type": "string"
+                    },
+                    "metricsNote": {
+                        "default": null,
+                        "description": "How to read the h-index and IF figures; set whenever metrics are shown",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "nextActions": {
+                        "items": {
+                            "$ref": "#/components/schemas/DiscoveryNextAction"
+                        },
+                        "type": "array"
+                    },
+                    "queryId": {
+                        "description": "Audit reference (disc_\u2026)",
+                        "type": "string"
+                    },
+                    "scopes": {
+                        "description": "One block per collection",
+                        "items": {
+                            "$ref": "#/components/schemas/DiscoveryScope"
+                        },
+                        "type": "array"
+                    },
+                    "text": {
+                        "description": "Pre-rendered text form (what MCP shows)",
+                        "type": "string"
+                    },
+                    "topic": {
+                        "default": null,
+                        "description": "Topic, for a topic-scoped journals answer",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    }
+                },
+                "required": [
+                    "intent",
+                    "queryId",
+                    "text"
+                ],
+                "type": "object"
+            },
+            "DiscoveryCallout": {
+                "properties": {
+                    "kind": {
+                        "const": "add_payment_method",
+                        "default": "add_payment_method",
+                        "enum": [
+                            "add_payment_method"
+                        ],
+                        "type": "string"
+                    },
+                    "message": {
+                        "description": "The notice, verbatim",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "message"
+                ],
+                "type": "object"
+            },
+            "DiscoveryCollectionItem": {
+                "properties": {
+                    "collectionKind": {
+                        "description": "physical, publisher, journal, curated or meta",
+                        "type": "string"
+                    },
+                    "description": {
+                        "default": null,
+                        "description": "Collection description",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "displayName": {
+                        "description": "Display name",
+                        "type": "string"
+                    },
+                    "kind": {
+                        "const": "collection",
+                        "default": "collection",
+                        "enum": [
+                            "collection"
+                        ],
+                        "type": "string"
+                    },
+                    "members": {
+                        "default": null,
+                        "description": "Member display names (metas only)",
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": [
+                            "array",
+                            "null"
+                        ]
+                    },
+                    "name": {
+                        "description": "Collection name to pass to search",
+                        "type": "string"
+                    },
+                    "pricePer1000": {
+                        "default": null,
+                        "description": "Your organisation's price per 1000 tokens, when a single price applies",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "priceRange": {
+                        "default": null,
+                        "description": "Min/max member price when a meta-collection's members differ",
+                        "properties": {
+                            "max": {
+                                "description": "Highest member price per 1000 tokens",
+                                "type": "string"
+                            },
+                            "min": {
+                                "description": "Lowest member price per 1000 tokens",
+                                "type": "string"
+                            },
+                            "per": {
+                                "enum": [
+                                    "1000_tokens"
+                                ],
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "min",
+                            "max",
+                            "per"
+                        ],
+                        "type": [
+                            "object",
+                            "null"
+                        ]
+                    },
+                    "revenueModel": {
+                        "description": "licensed or open_access",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "name",
+                    "displayName",
+                    "collectionKind",
+                    "revenueModel"
+                ],
+                "type": "object"
+            },
+            "DiscoveryJournalItem": {
+                "properties": {
+                    "hIndex": {
+                        "default": null,
+                        "description": "h-index (OpenAlex), null when unknown",
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "impactFactor": {
+                        "default": null,
+                        "description": "The journal's journal_metric.impact_factor: an impact factor computed by Redpine from OpenAlex citation data with the JIF formula. It is not Clarivate's Journal Impact Factor. Journals that publish many news items, letters and editorials (for example BMJ, JAMA, The Lancet) score far below their JCR figure, because OpenAlex classifies those items as articles. Null when unknown.",
+                        "type": [
+                            "number",
+                            "null"
+                        ]
+                    },
+                    "issnL": {
+                        "default": null,
+                        "description": "Linking ISSN when the journal is known to the metrics table",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "issns": {
+                        "description": "The journal's ISSNs present in your scope; filter on these to search it",
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    },
+                    "kind": {
+                        "const": "journal",
+                        "default": "journal",
+                        "enum": [
+                            "journal"
+                        ],
+                        "type": "string"
+                    },
+                    "publisher": {
+                        "default": null,
+                        "description": "Publisher, when known",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "title": {
+                        "description": "Journal title",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "title"
+                ],
+                "type": "object"
+            },
+            "DiscoveryNextAction": {
+                "properties": {
+                    "action": {
+                        "description": "search, list_collections, list_journals, request_journal",
+                        "type": "string"
+                    },
+                    "hint": {
+                        "description": "A ready-to-use call or a one-line instruction",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "action",
+                    "hint"
+                ],
+                "type": "object"
+            },
+            "DiscoveryPublisherItem": {
+                "properties": {
+                    "collections": {
+                        "description": "Collections (display names) it appears in",
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    },
+                    "kind": {
+                        "const": "publisher",
+                        "default": "publisher",
+                        "enum": [
+                            "publisher"
+                        ],
+                        "type": "string"
+                    },
+                    "name": {
+                        "description": "Publisher name as stored in the corpus",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "name"
+                ],
+                "type": "object"
+            },
+            "DiscoveryScope": {
+                "properties": {
+                    "collection": {
+                        "description": "The requested collection name",
+                        "type": "string"
+                    },
+                    "displayName": {
+                        "description": "Display name of the requested collection",
+                        "type": "string"
+                    },
+                    "issnValuesSeen": {
+                        "default": 0,
+                        "description": "Raw distinct ISSN values seen in your scope",
+                        "type": "integer"
+                    },
+                    "items": {
+                        "description": "Ranked items; the `kind` of each says which shape it is.",
+                        "items": {
+                            "oneOf": [
+                                {
+                                    "$ref": "#/components/schemas/DiscoveryJournalItem"
+                                },
+                                {
+                                    "$ref": "#/components/schemas/DiscoveryCollectionItem"
+                                },
+                                {
+                                    "$ref": "#/components/schemas/DiscoveryPublisherItem"
+                                }
+                            ]
+                        },
+                        "type": "array"
+                    },
+                    "note": {
+                        "default": null,
+                        "description": "A caveat about this block, when any",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "offset": {
+                        "default": 0,
+                        "description": "Rank of the first item in this page, zero-based",
+                        "type": "integer"
+                    },
+                    "publishers": {
+                        "description": "Publishers present in your scope of this collection",
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    },
+                    "rankedBy": {
+                        "default": null,
+                        "description": "How items are ordered",
+                        "enum": [
+                            "h_index",
+                            "relevant_content",
+                            null
+                        ],
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "sampledEntries": {
+                        "default": 0,
+                        "description": "ISSN groups seen in the corpus but unknown to the metrics table; never counted as proved journals",
+                        "type": "integer"
+                    },
+                    "shown": {
+                        "default": 0,
+                        "description": "Items in this page (and rendered in the text form)",
+                        "type": "integer"
+                    },
+                    "titleOnly": {
+                        "default": 0,
+                        "description": "Journals known only by a title (points with no ISSN)",
+                        "type": "integer"
+                    },
+                    "total": {
+                        "description": "Proved distinct journals (or items) in this scope",
+                        "type": "integer"
+                    },
+                    "truncatedInventory": {
+                        "default": false,
+                        "description": "True when the inventory is incomplete (limits or deadline)",
+                        "type": "boolean"
+                    },
+                    "unranked": {
+                        "description": "Journals with no metrics (sampled or title-only entries); never ranked",
+                        "items": {
+                            "$ref": "#/components/schemas/DiscoveryJournalItem"
+                        },
+                        "type": "array"
+                    },
+                    "unresolvedIssns": {
+                        "default": 0,
+                        "description": "ISSNs that could not be resolved to a title",
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "collection",
+                    "displayName",
+                    "total"
                 ],
                 "type": "object"
             },
@@ -426,6 +836,14 @@
                             "null"
                         ]
                     },
+                    "relevance": {
+                        "default": null,
+                        "description": "How well this passage answers the query, 0 to 1, rounded to three decimals. It scores the passage, not the paper. Null when the result has no score, including rows cached before this field existed.",
+                        "type": [
+                            "number",
+                            "null"
+                        ]
+                    },
                     "text": {
                         "description": "Full chunk text when `locked` is false. A short teaser snippet \u2014 never the full chunk \u2014 when `locked` is true.",
                         "type": "string"
@@ -460,6 +878,17 @@
                     "costToUnlockRemaining": {
                         "description": "Cost to unlock every result not yet unlocked. An estimate, not a binding quote: it is summed from each result's own individually-rounded cost, while the amount actually charged on the next unlock is computed per collection at that call's combined token total \u2014 the two can differ by a rounding fraction.",
                         "type": "string"
+                    },
+                    "discovery": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/DiscoveryAnswer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "A catalogue answer: what data sources, publishers or journals your key can reach. Present only when the query asked about the catalogue rather than for literature; then `results` is empty and nothing was charged (`X-Query-Cost: 0.000000`)."
                     },
                     "filterWarnings": {
                         "default": null,
@@ -521,6 +950,11 @@
                         },
                         "type": "array"
                     },
+                    "caseSummary": {
+                        "default": "",
+                        "description": "For a long query such as a patient case: the summary the results were judged against. Empty for an ordinary query.",
+                        "type": "string"
+                    },
                     "entities": {
                         "description": "Entities the query is about (substances, genes, diseases, organisms, methods)",
                         "items": {
@@ -537,6 +971,13 @@
                         "default": "",
                         "description": "What the query is asking for",
                         "type": "string"
+                    },
+                    "subQuestions": {
+                        "description": "The separate problems a long query was split into, each searched and given result slots on its own. Empty for a single-question query.",
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
                     }
                 },
                 "required": [],
@@ -631,7 +1072,7 @@
                     "filters": {
                         "additionalProperties": true,
                         "default": null,
-                        "description": "Optional metadata filter. Two accepted forms.\n\nFlat (top-level keys are ANDed): `{\"journal\": \"Nature\", \"publication_date\": {\"gte\": \"2020-01-01\"}}`.\n\nStructured DSL (for OR / nesting): `{\"and\": [{\"field\": \"journal\", \"eq\": \"Nature\"}]}`. Operators: `eq`, `ne`, `in`, `not_in`, `gt`, `gte`, `lt`, `lte`, `between`. Combinators: `and`, `or`, `not`. One operator per condition, except range bounds (`gt`, `gte`, `lt`, `lte`) together; put other combinations in separate conditions under `and`.\n\nMixing the flat and structured forms in one filter is rejected.\n\nExclusion uses `ne` / `not_in` / `not` \u2014 there is no separate syntax: `{\"and\": [{\"field\": \"issn\", \"not_in\": [\"1234-5679\"]}]}`.\n\nIndexed on every collection (a field that is not a known result metadata field is rejected; a known field without an index, such as `pmid`, is matched by scanning and returns a `filterWarnings` entry, and is rejected on a collection that has no index for it): `article_type`, `chapter_authors`, `chapter_number`, `chapter_title`, `doi`, `isbn`, `issn`, `journal`, `keywords`, `open_access`, `publication_date`, `publisher`, `section`.\n\nIndexed on the editorial collections only: `last_updated_date`, `medical_board_approved`, `topic`, `url`.\n\n`open_access` is also answered for a collection that holds only open-access content and carries no such field: `true` matches everything there, `false` (or the field under `or` / `not`) excludes that collection with a `filterWarnings` entry. `license` is returned in result metadata but is not filterable.\n\n`issn` accepts hyphenated or bare, upper- or lower-case X (`\"1234-561X\"`, `\"1234561x\"`). `doi` is matched case-insensitively and an optional `https://doi.org/` or `doi:` prefix is accepted.\n\n`journal_metric.2yr_mean_citedness`, `journal_metric.h_index`, `journal_metric.i10_index` and `journal_metric.impact_factor` accept range operators only and are resolved server-side into the matching ISSNs; see `journalMetricExpansions` in the response. `impact_factor` is an impact factor computed by Redpine from OpenAlex citation data with the JIF formula. It is not Clarivate's Journal Impact Factor. Journals that publish many news items, letters and editorials (for example BMJ, JAMA, The Lancet) score far below their JCR figure, because OpenAlex classifies those items as articles. A metric condition may match at most 35,000 journal ISSNs and a request may send at most 70,000 filter values. A threshold with one end must stay within its documented bound: journal_metric.2yr_mean_citedness: gte 1.1 or higher, or lte 0.0 or lower; journal_metric.h_index: gte 35 or higher, or lte 3 or lower; journal_metric.i10_index: gte 160 or higher (no upper bound alone); journal_metric.impact_factor: gte 0.9 or higher, or lte 0.2 or lower. On h_index and i10_index, gt N counts as gte N+1 and lt N as lte N-1. A range with both ends (gte with lte, or between) may sit anywhere if it matches no more than 35,000 ISSNs. For 'below X' use not with gte X, X at or above the metric's minimum; not also keeps documents with no journal metric, and on impact_factor journals with no impact_factor. Two conditions near their bounds use most of the 70,000 values, so a third, or a long in/not_in list beside them, can be refused.",
+                        "description": "Optional metadata filter. Two accepted forms.\n\nFlat (top-level keys are ANDed): `{\"journal\": \"Nature\", \"publication_date\": {\"gte\": \"2020-01-01\"}}`.\n\nStructured DSL (for OR / nesting): `{\"and\": [{\"field\": \"journal\", \"eq\": \"Nature\"}]}`. Operators: `eq`, `ne`, `in`, `not_in`, `gt`, `gte`, `lt`, `lte`, `between`. Combinators: `and`, `or`, `not`. One operator per condition, except range bounds (`gt`, `gte`, `lt`, `lte`) together; put other combinations in separate conditions under `and`.\n\nMixing the flat and structured forms in one filter is rejected.\n\nExclusion uses `ne` / `not_in` / `not` \u2014 there is no separate syntax: `{\"and\": [{\"field\": \"issn\", \"not_in\": [\"1234-5679\"]}]}`.\n\nIndexed on every collection (a field that is not a known result metadata field is rejected; a known field without an index, such as `pmid`, is matched by scanning and returns a `filterWarnings` entry, and is rejected on a collection that has no index for it): `article_type`, `chapter_authors`, `chapter_number`, `chapter_title`, `doi`, `isbn`, `issn`, `journal`, `keywords`, `open_access`, `publication_date`, `publisher`, `section`.\n\nIndexed on the editorial collections only: `has_results`, `last_updated_date`, `medical_board_approved`, `nct_id`, `overall_status`, `phases`, `topic`, `url`.\n\n`open_access` is also answered for a collection that holds only open-access content and carries no such field: `true` matches everything there, `false` (or the field under `or` / `not`) excludes that collection with a `filterWarnings` entry. `license` is returned in result metadata but is not filterable.\n\n`issn` accepts hyphenated or bare, upper- or lower-case X (`\"1234-561X\"`, `\"1234561x\"`). `doi` is matched case-insensitively and an optional `https://doi.org/` or `doi:` prefix is accepted.\n\n`journal_metric.2yr_mean_citedness`, `journal_metric.h_index`, `journal_metric.i10_index` and `journal_metric.impact_factor` accept range operators only and are resolved server-side into the matching ISSNs; see `journalMetricExpansions` in the response. `impact_factor` is an impact factor computed by Redpine from OpenAlex citation data with the JIF formula. It is not Clarivate's Journal Impact Factor. Journals that publish many news items, letters and editorials (for example BMJ, JAMA, The Lancet) score far below their JCR figure, because OpenAlex classifies those items as articles. A metric condition may match at most 35,000 journal ISSNs and a request may send at most 70,000 filter values. A threshold with one end must stay within its documented bound: journal_metric.2yr_mean_citedness: gte 1.1 or higher, or lte 0.0 or lower; journal_metric.h_index: gte 35 or higher, or lte 3 or lower; journal_metric.i10_index: gte 160 or higher (no upper bound alone); journal_metric.impact_factor: gte 0.9 or higher, or lte 0.2 or lower. On h_index and i10_index, gt N counts as gte N+1 and lt N as lte N-1. A range with both ends (gte with lte, or between) may sit anywhere if it matches no more than 35,000 ISSNs. For 'below X' use not with gte X, X at or above the metric's minimum; not also keeps documents with no journal metric, and on impact_factor journals with no impact_factor. Two conditions near their bounds use most of the 70,000 values, so a third, or a long in/not_in list beside them, can be refused.",
                         "type": [
                             "object",
                             "null"
@@ -683,7 +1124,7 @@
                     "filters": {
                         "additionalProperties": true,
                         "default": null,
-                        "description": "Optional metadata filter. Two accepted forms.\n\nFlat (top-level keys are ANDed): `{\"journal\": \"Nature\", \"publication_date\": {\"gte\": \"2020-01-01\"}}`.\n\nStructured DSL (for OR / nesting): `{\"and\": [{\"field\": \"journal\", \"eq\": \"Nature\"}]}`. Operators: `eq`, `ne`, `in`, `not_in`, `gt`, `gte`, `lt`, `lte`, `between`. Combinators: `and`, `or`, `not`. One operator per condition, except range bounds (`gt`, `gte`, `lt`, `lte`) together; put other combinations in separate conditions under `and`.\n\nMixing the flat and structured forms in one filter is rejected.\n\nExclusion uses `ne` / `not_in` / `not` \u2014 there is no separate syntax: `{\"and\": [{\"field\": \"issn\", \"not_in\": [\"1234-5679\"]}]}`.\n\nIndexed on every collection (a field that is not a known result metadata field is rejected; a known field without an index, such as `pmid`, is matched by scanning and returns a `filterWarnings` entry, and is rejected on a collection that has no index for it): `article_type`, `chapter_authors`, `chapter_number`, `chapter_title`, `doi`, `isbn`, `issn`, `journal`, `keywords`, `open_access`, `publication_date`, `publisher`, `section`.\n\nIndexed on the editorial collections only: `last_updated_date`, `medical_board_approved`, `topic`, `url`.\n\n`open_access` is also answered for a collection that holds only open-access content and carries no such field: `true` matches everything there, `false` (or the field under `or` / `not`) excludes that collection with a `filterWarnings` entry. `license` is returned in result metadata but is not filterable.\n\n`issn` accepts hyphenated or bare, upper- or lower-case X (`\"1234-561X\"`, `\"1234561x\"`). `doi` is matched case-insensitively and an optional `https://doi.org/` or `doi:` prefix is accepted.\n\n`journal_metric.2yr_mean_citedness`, `journal_metric.h_index`, `journal_metric.i10_index` and `journal_metric.impact_factor` accept range operators only and are resolved server-side into the matching ISSNs; see `journalMetricExpansions` in the response. `impact_factor` is an impact factor computed by Redpine from OpenAlex citation data with the JIF formula. It is not Clarivate's Journal Impact Factor. Journals that publish many news items, letters and editorials (for example BMJ, JAMA, The Lancet) score far below their JCR figure, because OpenAlex classifies those items as articles. A metric condition may match at most 35,000 journal ISSNs and a request may send at most 70,000 filter values. A threshold with one end must stay within its documented bound: journal_metric.2yr_mean_citedness: gte 1.1 or higher, or lte 0.0 or lower; journal_metric.h_index: gte 35 or higher, or lte 3 or lower; journal_metric.i10_index: gte 160 or higher (no upper bound alone); journal_metric.impact_factor: gte 0.9 or higher, or lte 0.2 or lower. On h_index and i10_index, gt N counts as gte N+1 and lt N as lte N-1. A range with both ends (gte with lte, or between) may sit anywhere if it matches no more than 35,000 ISSNs. For 'below X' use not with gte X, X at or above the metric's minimum; not also keeps documents with no journal metric, and on impact_factor journals with no impact_factor. Two conditions near their bounds use most of the 70,000 values, so a third, or a long in/not_in list beside them, can be refused.",
+                        "description": "Optional metadata filter. Two accepted forms.\n\nFlat (top-level keys are ANDed): `{\"journal\": \"Nature\", \"publication_date\": {\"gte\": \"2020-01-01\"}}`.\n\nStructured DSL (for OR / nesting): `{\"and\": [{\"field\": \"journal\", \"eq\": \"Nature\"}]}`. Operators: `eq`, `ne`, `in`, `not_in`, `gt`, `gte`, `lt`, `lte`, `between`. Combinators: `and`, `or`, `not`. One operator per condition, except range bounds (`gt`, `gte`, `lt`, `lte`) together; put other combinations in separate conditions under `and`.\n\nMixing the flat and structured forms in one filter is rejected.\n\nExclusion uses `ne` / `not_in` / `not` \u2014 there is no separate syntax: `{\"and\": [{\"field\": \"issn\", \"not_in\": [\"1234-5679\"]}]}`.\n\nIndexed on every collection (a field that is not a known result metadata field is rejected; a known field without an index, such as `pmid`, is matched by scanning and returns a `filterWarnings` entry, and is rejected on a collection that has no index for it): `article_type`, `chapter_authors`, `chapter_number`, `chapter_title`, `doi`, `isbn`, `issn`, `journal`, `keywords`, `open_access`, `publication_date`, `publisher`, `section`.\n\nIndexed on the editorial collections only: `has_results`, `last_updated_date`, `medical_board_approved`, `nct_id`, `overall_status`, `phases`, `topic`, `url`.\n\n`open_access` is also answered for a collection that holds only open-access content and carries no such field: `true` matches everything there, `false` (or the field under `or` / `not`) excludes that collection with a `filterWarnings` entry. `license` is returned in result metadata but is not filterable.\n\n`issn` accepts hyphenated or bare, upper- or lower-case X (`\"1234-561X\"`, `\"1234561x\"`). `doi` is matched case-insensitively and an optional `https://doi.org/` or `doi:` prefix is accepted.\n\n`journal_metric.2yr_mean_citedness`, `journal_metric.h_index`, `journal_metric.i10_index` and `journal_metric.impact_factor` accept range operators only and are resolved server-side into the matching ISSNs; see `journalMetricExpansions` in the response. `impact_factor` is an impact factor computed by Redpine from OpenAlex citation data with the JIF formula. It is not Clarivate's Journal Impact Factor. Journals that publish many news items, letters and editorials (for example BMJ, JAMA, The Lancet) score far below their JCR figure, because OpenAlex classifies those items as articles. A metric condition may match at most 35,000 journal ISSNs and a request may send at most 70,000 filter values. A threshold with one end must stay within its documented bound: journal_metric.2yr_mean_citedness: gte 1.1 or higher, or lte 0.0 or lower; journal_metric.h_index: gte 35 or higher, or lte 3 or lower; journal_metric.i10_index: gte 160 or higher (no upper bound alone); journal_metric.impact_factor: gte 0.9 or higher, or lte 0.2 or lower. On h_index and i10_index, gt N counts as gte N+1 and lt N as lte N-1. A range with both ends (gte with lte, or between) may sit anywhere if it matches no more than 35,000 ISSNs. For 'below X' use not with gte X, X at or above the metric's minimum; not also keeps documents with no journal metric, and on impact_factor journals with no impact_factor. Two conditions near their bounds use most of the 70,000 values, so a third, or a long in/not_in list beside them, can be refused.",
                         "type": [
                             "object",
                             "null"
@@ -741,6 +1182,17 @@
             },
             "SearchResponse": {
                 "properties": {
+                    "discovery": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/DiscoveryAnswer"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "A catalogue answer: what data sources, publishers or journals your key can reach. Present only when the query asked about the catalogue rather than for literature; then `results` is empty and nothing was charged (`X-Query-Cost: 0.000000`)."
+                    },
                     "filterWarnings": {
                         "default": null,
                         "description": "Advisory warnings about the supplied filter \u2014 for example filtering on a known field with no payload index, which is matched by scanning, or a collection excluded because it holds only open-access content and the filter asked for open_access=false. The search still runs. Omitted when there are none.",
@@ -815,6 +1267,14 @@
                         "description": "Document metadata (title, authors, journal, etc.). Null when includeMetadata is false.",
                         "type": [
                             "object",
+                            "null"
+                        ]
+                    },
+                    "relevance": {
+                        "default": null,
+                        "description": "How well this passage answers the query, 0 to 1, rounded to three decimals. It scores the passage, not the paper. Null when the result has no score, including rows cached before this field existed.",
+                        "type": [
+                            "number",
                             "null"
                         ]
                     },
@@ -935,7 +1395,7 @@
         }
     },
     "info": {
-        "description": "Hybrid retrieval API for searching biomedical and scientific document collections. Combines dense vector search, sparse keyword matching, and cross-encoder reranking to deliver high-precision results.",
+        "description": "Hybrid retrieval API for searching biomedical and scientific document collections. Combines dense vector search and sparse keyword matching to deliver high-precision results.",
         "title": "Redpine Connect Search API",
         "version": "1.0.0"
     },
@@ -1125,6 +1585,148 @@
                 ]
             }
         },
+        "/api/v1/search/collections/{name}/journals": {
+            "get": {
+                "description": "Free. Journals present in your scope of the collection, ranked by h-index (each with its journal_metric.impact_factor, an impact factor computed by Redpine from OpenAlex citation data with the JIF formula. It is not Clarivate's Journal Impact Factor. Journals that publish many news items, letters and editorials (for example BMJ, JAMA, The Lancet) score far below their JCR figure, because OpenAlex classifies those items as articles.), or with `topic` by the relevant content each journal holds on it. Only journals anchored to the metrics table count as proved; sampled, title-only and unresolved entries are reported beside the total. Each journal carries the ISSNs to filter a search on.",
+                "operationId": "listCollectionJournals",
+                "parameters": [
+                    {
+                        "description": "Collection name.",
+                        "in": "path",
+                        "name": "name",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Rank journals by their relevant content on this topic.",
+                        "in": "query",
+                        "name": "topic",
+                        "required": false,
+                        "schema": {
+                            "maxLength": 200,
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Narrow to one publisher.",
+                        "in": "query",
+                        "name": "publisher",
+                        "required": false,
+                        "schema": {
+                            "maxLength": 200,
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "description": "Minimum h-index.",
+                        "in": "query",
+                        "name": "min_h_index",
+                        "required": false,
+                        "schema": {
+                            "maximum": 10000,
+                            "minimum": 0,
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Journals per page.",
+                        "in": "query",
+                        "name": "limit",
+                        "required": false,
+                        "schema": {
+                            "default": 50,
+                            "maximum": 200,
+                            "minimum": 1,
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "description": "Rank of the first journal to return, zero-based.",
+                        "in": "query",
+                        "name": "offset",
+                        "required": false,
+                        "schema": {
+                            "default": 0,
+                            "maximum": 1000000,
+                            "minimum": 0,
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DiscoveryAnswer"
+                                }
+                            }
+                        },
+                        "description": "The catalogue answer",
+                        "headers": {
+                            "X-Query-Cost": {
+                                "description": "Always 0.000000.",
+                                "schema": {
+                                    "type": "string"
+                                }
+                            },
+                            "X-Tokens-Used": {
+                                "description": "Always 0: a catalogue answer bills nothing.",
+                                "schema": {
+                                    "type": "integer"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "description": "Missing or invalid API key"
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "description": "API key does not have access to the collection"
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "description": "Collection not found"
+                    },
+                    "503": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        },
+                        "description": "The answer could not be recorded or the index is unavailable; retry"
+                    }
+                },
+                "summary": "List the journals your key can reach in a collection",
+                "tags": [
+                    "search"
+                ]
+            }
+        },
         "/api/v1/search/preview": {
             "post": {
                 "description": "Run the same pipeline as POST /api/v1/search/query -- same entitlement checks, same retraction filtering, same relevance ranking -- but never charge for it. Every result comes back locked, with a teaser snippet in `text` and the cost to unlock it. Works even at a zero balance. Consumes no credits, no trial query and no quota.\n\nCall POST /api/v1/search/unlock with the returned `queryId` to pay for and receive some or all of the results in full.\n\nSend an `Idempotency-Key` header to make retries safe: a repeat with the same key and body returns the original `queryId` instead of buying the same results again under a new one.",
@@ -1254,7 +1856,7 @@
         },
         "/api/v1/search/query": {
             "post": {
-                "description": "Search one or more collections using natural language or keyword queries. Results are ranked by relevance using hybrid retrieval (dense + sparse + reranking). Pass `collections` (up to 5) to search several collections in one call and receive a single merged, relevance-ranked list with per-result origin labels.",
+                "description": "Search one or more collections using natural language or keyword queries. Results are ranked by relevance using hybrid retrieval (dense + sparse). Pass `collections` (up to 5) to search several collections in one call and receive a single merged, relevance-ranked list with per-result origin labels.",
                 "operationId": "searchQuery",
                 "requestBody": {
                     "content": {
@@ -1685,7 +2287,7 @@
                                     "filters": {
                                         "additionalProperties": true,
                                         "default": null,
-                                        "description": "Optional metadata filter. Two accepted forms.\n\nFlat (top-level keys are ANDed): `{\"journal\": \"Nature\", \"publication_date\": {\"gte\": \"2020-01-01\"}}`.\n\nStructured DSL (for OR / nesting): `{\"and\": [{\"field\": \"journal\", \"eq\": \"Nature\"}]}`. Operators: `eq`, `ne`, `in`, `not_in`, `gt`, `gte`, `lt`, `lte`, `between`. Combinators: `and`, `or`, `not`. One operator per condition, except range bounds (`gt`, `gte`, `lt`, `lte`) together; put other combinations in separate conditions under `and`.\n\nMixing the flat and structured forms in one filter is rejected.\n\nExclusion uses `ne` / `not_in` / `not` \u2014 there is no separate syntax: `{\"and\": [{\"field\": \"issn\", \"not_in\": [\"1234-5679\"]}]}`.\n\nIndexed on every collection (a field that is not a known result metadata field is rejected; a known field without an index, such as `pmid`, is matched by scanning and returns a `filterWarnings` entry, and is rejected on a collection that has no index for it): `article_type`, `chapter_authors`, `chapter_number`, `chapter_title`, `doi`, `isbn`, `issn`, `journal`, `keywords`, `open_access`, `publication_date`, `publisher`, `section`.\n\nIndexed on the editorial collections only: `last_updated_date`, `medical_board_approved`, `topic`, `url`.\n\n`open_access` is also answered for a collection that holds only open-access content and carries no such field: `true` matches everything there, `false` (or the field under `or` / `not`) excludes that collection with a `filterWarnings` entry. `license` is returned in result metadata but is not filterable.\n\n`issn` accepts hyphenated or bare, upper- or lower-case X (`\"1234-561X\"`, `\"1234561x\"`). `doi` is matched case-insensitively and an optional `https://doi.org/` or `doi:` prefix is accepted.\n\n`journal_metric.2yr_mean_citedness`, `journal_metric.h_index`, `journal_metric.i10_index` and `journal_metric.impact_factor` accept range operators only and are resolved server-side into the matching ISSNs; see `journalMetricExpansions` in the response. `impact_factor` is an impact factor computed by Redpine from OpenAlex citation data with the JIF formula. It is not Clarivate's Journal Impact Factor. Journals that publish many news items, letters and editorials (for example BMJ, JAMA, The Lancet) score far below their JCR figure, because OpenAlex classifies those items as articles. A metric condition may match at most 35,000 journal ISSNs and a request may send at most 70,000 filter values. A threshold with one end must stay within its documented bound: journal_metric.2yr_mean_citedness: gte 1.1 or higher, or lte 0.0 or lower; journal_metric.h_index: gte 35 or higher, or lte 3 or lower; journal_metric.i10_index: gte 160 or higher (no upper bound alone); journal_metric.impact_factor: gte 0.9 or higher, or lte 0.2 or lower. On h_index and i10_index, gt N counts as gte N+1 and lt N as lte N-1. A range with both ends (gte with lte, or between) may sit anywhere if it matches no more than 35,000 ISSNs. For 'below X' use not with gte X, X at or above the metric's minimum; not also keeps documents with no journal metric, and on impact_factor journals with no impact_factor. Two conditions near their bounds use most of the 70,000 values, so a third, or a long in/not_in list beside them, can be refused.",
+                                        "description": "Optional metadata filter. Two accepted forms.\n\nFlat (top-level keys are ANDed): `{\"journal\": \"Nature\", \"publication_date\": {\"gte\": \"2020-01-01\"}}`.\n\nStructured DSL (for OR / nesting): `{\"and\": [{\"field\": \"journal\", \"eq\": \"Nature\"}]}`. Operators: `eq`, `ne`, `in`, `not_in`, `gt`, `gte`, `lt`, `lte`, `between`. Combinators: `and`, `or`, `not`. One operator per condition, except range bounds (`gt`, `gte`, `lt`, `lte`) together; put other combinations in separate conditions under `and`.\n\nMixing the flat and structured forms in one filter is rejected.\n\nExclusion uses `ne` / `not_in` / `not` \u2014 there is no separate syntax: `{\"and\": [{\"field\": \"issn\", \"not_in\": [\"1234-5679\"]}]}`.\n\nIndexed on every collection (a field that is not a known result metadata field is rejected; a known field without an index, such as `pmid`, is matched by scanning and returns a `filterWarnings` entry, and is rejected on a collection that has no index for it): `article_type`, `chapter_authors`, `chapter_number`, `chapter_title`, `doi`, `isbn`, `issn`, `journal`, `keywords`, `open_access`, `publication_date`, `publisher`, `section`.\n\nIndexed on the editorial collections only: `has_results`, `last_updated_date`, `medical_board_approved`, `nct_id`, `overall_status`, `phases`, `topic`, `url`.\n\n`open_access` is also answered for a collection that holds only open-access content and carries no such field: `true` matches everything there, `false` (or the field under `or` / `not`) excludes that collection with a `filterWarnings` entry. `license` is returned in result metadata but is not filterable.\n\n`issn` accepts hyphenated or bare, upper- or lower-case X (`\"1234-561X\"`, `\"1234561x\"`). `doi` is matched case-insensitively and an optional `https://doi.org/` or `doi:` prefix is accepted.\n\n`journal_metric.2yr_mean_citedness`, `journal_metric.h_index`, `journal_metric.i10_index` and `journal_metric.impact_factor` accept range operators only and are resolved server-side into the matching ISSNs; see `journalMetricExpansions` in the response. `impact_factor` is an impact factor computed by Redpine from OpenAlex citation data with the JIF formula. It is not Clarivate's Journal Impact Factor. Journals that publish many news items, letters and editorials (for example BMJ, JAMA, The Lancet) score far below their JCR figure, because OpenAlex classifies those items as articles. A metric condition may match at most 35,000 journal ISSNs and a request may send at most 70,000 filter values. A threshold with one end must stay within its documented bound: journal_metric.2yr_mean_citedness: gte 1.1 or higher, or lte 0.0 or lower; journal_metric.h_index: gte 35 or higher, or lte 3 or lower; journal_metric.i10_index: gte 160 or higher (no upper bound alone); journal_metric.impact_factor: gte 0.9 or higher, or lte 0.2 or lower. On h_index and i10_index, gt N counts as gte N+1 and lt N as lte N-1. A range with both ends (gte with lte, or between) may sit anywhere if it matches no more than 35,000 ISSNs. For 'below X' use not with gte X, X at or above the metric's minimum; not also keeps documents with no journal metric, and on impact_factor journals with no impact_factor. Two conditions near their bounds use most of the 70,000 values, so a third, or a long in/not_in list beside them, can be refused.",
                                         "type": [
                                             "object",
                                             "null"

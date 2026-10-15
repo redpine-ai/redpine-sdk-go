@@ -13,6 +13,14 @@ import (
 // DefaultBaseURL is the production API. Override only via env REDPINE_BASE_URL.
 const DefaultBaseURL = "https://api.redpine.ai"
 
+// Without WithTimeout, calls wait DefaultTimeout and AssistedSearch waits AssistedTimeout:
+// assisted search reads whole documents and the server allows it up to 75 seconds.
+// WithTimeout applies to every call.
+const (
+	DefaultTimeout  = 30 * time.Second
+	AssistedTimeout = 120 * time.Second
+)
+
 const (
 	envAPIKey         = "REDPINE_API_KEY"
 	envAPIKeyFallback = "CONNECT_API_KEY"
@@ -62,6 +70,7 @@ func resolveBaseURL() (string, error) {
 // exported Redpine class.
 type Redpine struct {
 	gen        *ClientWithResponses
+	assisted   *ClientWithResponses // gen, or one with a longer timeout
 	maxRetries int
 	sleep      func(context.Context, time.Duration) error
 }
@@ -72,18 +81,21 @@ type Option func(*config)
 type config struct {
 	apiKey     string
 	timeout    time.Duration
+	timeoutSet bool
 	maxRetries int
 	httpClient *http.Client
 }
 
-func WithAPIKey(k string) Option         { return func(c *config) { c.apiKey = k } }
-func WithTimeout(d time.Duration) Option { return func(c *config) { c.timeout = d } }
-func WithMaxRetries(n int) Option        { return func(c *config) { c.maxRetries = n } }
-func WithHTTP(h *http.Client) Option     { return func(c *config) { c.httpClient = h } }
+func WithAPIKey(k string) Option { return func(c *config) { c.apiKey = k } }
+func WithTimeout(d time.Duration) Option {
+	return func(c *config) { c.timeout, c.timeoutSet = d, true }
+}
+func WithMaxRetries(n int) Option    { return func(c *config) { c.maxRetries = n } }
+func WithHTTP(h *http.Client) Option { return func(c *config) { c.httpClient = h } }
 
 // New builds a Redpine client. Key from WithAPIKey, else REDPINE_API_KEY, else CONNECT_API_KEY.
 func New(opts ...Option) (*Redpine, error) {
-	cfg := config{timeout: 30 * time.Second, maxRetries: 2}
+	cfg := config{maxRetries: 2}
 	for _, o := range opts {
 		o(&cfg)
 	}
@@ -91,25 +103,39 @@ func New(opts ...Option) (*Redpine, error) {
 	if err != nil {
 		return nil, err
 	}
-	hc := cfg.httpClient
+	hc, hcAssisted := cfg.httpClient, cfg.httpClient
 	if hc == nil {
-		hc = &http.Client{Timeout: cfg.timeout}
+		if cfg.timeoutSet { // WithTimeout(0) still means no timeout
+			hc = &http.Client{Timeout: cfg.timeout}
+			hcAssisted = hc
+		} else {
+			hc, hcAssisted = &http.Client{Timeout: DefaultTimeout}, &http.Client{Timeout: AssistedTimeout}
+		}
 	}
 	baseURL, err := resolveBaseURL()
 	if err != nil {
 		return nil, err
 	}
-	gen, err := NewClientWithResponses(baseURL,
-		WithHTTPClient(hc),
-		WithRequestEditorFn(func(_ context.Context, req *http.Request) error {
-			req.Header.Set("Authorization", "Bearer "+key)
-			return nil
-		}),
-	)
+	build := func(h *http.Client) (*ClientWithResponses, error) {
+		return NewClientWithResponses(baseURL,
+			WithHTTPClient(h),
+			WithRequestEditorFn(func(_ context.Context, req *http.Request) error {
+				req.Header.Set("Authorization", "Bearer "+key)
+				return nil
+			}),
+		)
+	}
+	gen, err := build(hc)
 	if err != nil {
 		return nil, err
 	}
-	return &Redpine{gen: gen, maxRetries: cfg.maxRetries, sleep: sleepCtx}, nil
+	assisted := gen
+	if hcAssisted != hc {
+		if assisted, err = build(hcAssisted); err != nil {
+			return nil, err
+		}
+	}
+	return &Redpine{gen: gen, assisted: assisted, maxRetries: cfg.maxRetries, sleep: sleepCtx}, nil
 }
 
 func sleepCtx(ctx context.Context, d time.Duration) error {
@@ -280,7 +306,7 @@ func (c *Redpine) AssistedSearch(ctx context.Context, query string, o AssistedSe
 	body.Limit, body.AllowClarification, body.IncludeMetadata, body.IncludeFigures, body.Filters = &lim, &ac, &im, &ifg, filters
 	body.ImageMaxHeight, body.ImageMaxWidth, body.ImageQuality = intp(imageMaxHeight), intp(imageMaxWidth), intp(imageQuality)
 	raw, err := c.call(ctx, func() (*http.Response, []byte, error) {
-		r, err := c.gen.SearchAssistedWithResponse(ctx, body)
+		r, err := c.assisted.SearchAssistedWithResponse(ctx, body)
 		if err != nil {
 			return nil, nil, err
 		}

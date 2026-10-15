@@ -38,6 +38,123 @@ func (e AssistedSearchResponseStatus) Valid() bool {
 	}
 }
 
+// Defines values for DiscoveryAnswerIntent.
+const (
+	Journals   DiscoveryAnswerIntent = "journals"
+	Publishers DiscoveryAnswerIntent = "publishers"
+	Sources    DiscoveryAnswerIntent = "sources"
+)
+
+// Valid indicates whether the value is a known member of the DiscoveryAnswerIntent enum.
+func (e DiscoveryAnswerIntent) Valid() bool {
+	switch e {
+	case Journals:
+		return true
+	case Publishers:
+		return true
+	case Sources:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DiscoveryCalloutKind.
+const (
+	AddPaymentMethod DiscoveryCalloutKind = "add_payment_method"
+)
+
+// Valid indicates whether the value is a known member of the DiscoveryCalloutKind enum.
+func (e DiscoveryCalloutKind) Valid() bool {
+	switch e {
+	case AddPaymentMethod:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DiscoveryCollectionItemKind.
+const (
+	Collection DiscoveryCollectionItemKind = "collection"
+)
+
+// Valid indicates whether the value is a known member of the DiscoveryCollectionItemKind enum.
+func (e DiscoveryCollectionItemKind) Valid() bool {
+	switch e {
+	case Collection:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DiscoveryCollectionItemPriceRangePer.
+const (
+	N1000Tokens DiscoveryCollectionItemPriceRangePer = "1000_tokens"
+)
+
+// Valid indicates whether the value is a known member of the DiscoveryCollectionItemPriceRangePer enum.
+func (e DiscoveryCollectionItemPriceRangePer) Valid() bool {
+	switch e {
+	case N1000Tokens:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DiscoveryJournalItemKind.
+const (
+	Journal DiscoveryJournalItemKind = "journal"
+)
+
+// Valid indicates whether the value is a known member of the DiscoveryJournalItemKind enum.
+func (e DiscoveryJournalItemKind) Valid() bool {
+	switch e {
+	case Journal:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DiscoveryPublisherItemKind.
+const (
+	Publisher DiscoveryPublisherItemKind = "publisher"
+)
+
+// Valid indicates whether the value is a known member of the DiscoveryPublisherItemKind enum.
+func (e DiscoveryPublisherItemKind) Valid() bool {
+	switch e {
+	case Publisher:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DiscoveryScopeRankedBy.
+const (
+	HIndex          DiscoveryScopeRankedBy = "h_index"
+	LessThannil     DiscoveryScopeRankedBy = "<nil>"
+	RelevantContent DiscoveryScopeRankedBy = "relevant_content"
+)
+
+// Valid indicates whether the value is a known member of the DiscoveryScopeRankedBy enum.
+func (e DiscoveryScopeRankedBy) Valid() bool {
+	switch e {
+	case HIndex:
+		return true
+	case LessThannil:
+		return true
+	case RelevantContent:
+		return true
+	default:
+		return false
+	}
+}
+
 // AssistedBillingInfo What was actually charged — only delivered, verified results are billed.
 type AssistedBillingInfo struct {
 	// ChargedResults Number of results billed
@@ -79,7 +196,7 @@ type AssistedSearchRequest struct {
 	// Limit Maximum verified results to return.
 	Limit *int `json:"limit,omitempty"`
 
-	// Query Search query text
+	// Query Search query text, or a whole document such as a patient case or chart note (max 16000 characters)
 	Query string `json:"query"`
 }
 
@@ -90,6 +207,9 @@ type AssistedSearchResponse struct {
 
 	// Clarification Set only when status is `clarification_needed`.
 	Clarification *ClarificationInfo `json:"clarification,omitempty"`
+
+	// Discovery A catalogue answer: what data sources, publishers or journals your key can reach. Present only when the query asked about the catalogue rather than for literature; then `results` is empty and nothing was charged (`X-Query-Cost: 0.000000`).
+	Discovery *DiscoveryAnswer `json:"discovery,omitempty"`
 
 	// FilterWarnings Advisory warnings about the supplied filter — for example filtering on a known field with no payload index, which is matched by scanning, or a collection excluded because it holds only open-access content and the filter asked for open_access=false. The search still runs. Omitted when there are none.
 	FilterWarnings *[]FilterWarning `json:"filterWarnings,omitempty"`
@@ -139,6 +259,9 @@ type AssistedSearchResult struct {
 	// Section Comma-joined source section(s) of the article, from the normalized vocabulary (abstract, introduction, background, methods, results, discussion, conclusion, case, supplementary, other)
 	Section *string `json:"section,omitempty"`
 
+	// SubQuestion The sub-question of a multi-problem query that this result answers; null when the query was answered as a single question
+	SubQuestion *string `json:"subQuestion,omitempty"`
+
 	// Text Chunk text content
 	Text string `json:"text"`
 }
@@ -166,6 +289,189 @@ type CollectionsResponse struct {
 	// Count Total number of accessible collections.
 	Count int `json:"count"`
 }
+
+// DiscoveryAnswer A catalogue answer: what data sources, publishers or journals your key can reach. Present only when the query asked about the catalogue rather than for literature; then `results` is empty and nothing was charged (`X-Query-Cost: 0.000000`).
+type DiscoveryAnswer struct {
+	// Callout Set when there is a notice (today: add a payment method to unlock licensed journals).
+	Callout *DiscoveryCallout `json:"callout,omitempty"`
+
+	// Intent Which catalogue question was answered
+	Intent DiscoveryAnswerIntent `json:"intent"`
+
+	// MetricsNote How to read the h-index and IF figures; set whenever metrics are shown
+	MetricsNote *string                `json:"metricsNote,omitempty"`
+	NextActions *[]DiscoveryNextAction `json:"nextActions,omitempty"`
+
+	// QueryId Audit reference (disc_…)
+	QueryId string `json:"queryId"`
+
+	// Scopes One block per collection
+	Scopes *[]DiscoveryScope `json:"scopes,omitempty"`
+
+	// Text Pre-rendered text form (what MCP shows)
+	Text string `json:"text"`
+
+	// Topic Topic, for a topic-scoped journals answer
+	Topic *string `json:"topic,omitempty"`
+}
+
+// DiscoveryAnswerIntent Which catalogue question was answered
+type DiscoveryAnswerIntent string
+
+// DiscoveryCallout defines model for DiscoveryCallout.
+type DiscoveryCallout struct {
+	Kind *DiscoveryCalloutKind `json:"kind,omitempty"`
+
+	// Message The notice, verbatim
+	Message string `json:"message"`
+}
+
+// DiscoveryCalloutKind defines model for DiscoveryCallout.Kind.
+type DiscoveryCalloutKind string
+
+// DiscoveryCollectionItem defines model for DiscoveryCollectionItem.
+type DiscoveryCollectionItem struct {
+	// CollectionKind physical, publisher, journal, curated or meta
+	CollectionKind string `json:"collectionKind"`
+
+	// Description Collection description
+	Description *string `json:"description,omitempty"`
+
+	// DisplayName Display name
+	DisplayName string                       `json:"displayName"`
+	Kind        *DiscoveryCollectionItemKind `json:"kind,omitempty"`
+
+	// Members Member display names (metas only)
+	Members *[]string `json:"members,omitempty"`
+
+	// Name Collection name to pass to search
+	Name string `json:"name"`
+
+	// PricePer1000 Your organisation's price per 1000 tokens, when a single price applies
+	PricePer1000 *string `json:"pricePer1000,omitempty"`
+
+	// PriceRange Min/max member price when a meta-collection's members differ
+	PriceRange *struct {
+		// Max Highest member price per 1000 tokens
+		Max string `json:"max"`
+
+		// Min Lowest member price per 1000 tokens
+		Min string                               `json:"min"`
+		Per DiscoveryCollectionItemPriceRangePer `json:"per"`
+	} `json:"priceRange,omitempty"`
+
+	// RevenueModel licensed or open_access
+	RevenueModel string `json:"revenueModel"`
+}
+
+// DiscoveryCollectionItemKind defines model for DiscoveryCollectionItem.Kind.
+type DiscoveryCollectionItemKind string
+
+// DiscoveryCollectionItemPriceRangePer defines model for DiscoveryCollectionItem.PriceRange.Per.
+type DiscoveryCollectionItemPriceRangePer string
+
+// DiscoveryJournalItem defines model for DiscoveryJournalItem.
+type DiscoveryJournalItem struct {
+	// HIndex h-index (OpenAlex), null when unknown
+	HIndex *int `json:"hIndex,omitempty"`
+
+	// ImpactFactor The journal's journal_metric.impact_factor: an impact factor computed by Redpine from OpenAlex citation data with the JIF formula. It is not Clarivate's Journal Impact Factor. Journals that publish many news items, letters and editorials (for example BMJ, JAMA, The Lancet) score far below their JCR figure, because OpenAlex classifies those items as articles. Null when unknown.
+	ImpactFactor *float32 `json:"impactFactor,omitempty"`
+
+	// IssnL Linking ISSN when the journal is known to the metrics table
+	IssnL *string `json:"issnL,omitempty"`
+
+	// Issns The journal's ISSNs present in your scope; filter on these to search it
+	Issns *[]string                 `json:"issns,omitempty"`
+	Kind  *DiscoveryJournalItemKind `json:"kind,omitempty"`
+
+	// Publisher Publisher, when known
+	Publisher *string `json:"publisher,omitempty"`
+
+	// Title Journal title
+	Title string `json:"title"`
+}
+
+// DiscoveryJournalItemKind defines model for DiscoveryJournalItem.Kind.
+type DiscoveryJournalItemKind string
+
+// DiscoveryNextAction defines model for DiscoveryNextAction.
+type DiscoveryNextAction struct {
+	// Action search, list_collections, list_journals, request_journal
+	Action string `json:"action"`
+
+	// Hint A ready-to-use call or a one-line instruction
+	Hint string `json:"hint"`
+}
+
+// DiscoveryPublisherItem defines model for DiscoveryPublisherItem.
+type DiscoveryPublisherItem struct {
+	// Collections Collections (display names) it appears in
+	Collections *[]string                   `json:"collections,omitempty"`
+	Kind        *DiscoveryPublisherItemKind `json:"kind,omitempty"`
+
+	// Name Publisher name as stored in the corpus
+	Name string `json:"name"`
+}
+
+// DiscoveryPublisherItemKind defines model for DiscoveryPublisherItem.Kind.
+type DiscoveryPublisherItemKind string
+
+// DiscoveryScope defines model for DiscoveryScope.
+type DiscoveryScope struct {
+	// Collection The requested collection name
+	Collection string `json:"collection"`
+
+	// DisplayName Display name of the requested collection
+	DisplayName string `json:"displayName"`
+
+	// IssnValuesSeen Raw distinct ISSN values seen in your scope
+	IssnValuesSeen *int `json:"issnValuesSeen,omitempty"`
+
+	// Items Ranked items; the `kind` of each says which shape it is.
+	Items *[]DiscoveryScope_Items_Item `json:"items,omitempty"`
+
+	// Note A caveat about this block, when any
+	Note *string `json:"note,omitempty"`
+
+	// Offset Rank of the first item in this page, zero-based
+	Offset *int `json:"offset,omitempty"`
+
+	// Publishers Publishers present in your scope of this collection
+	Publishers *[]string `json:"publishers,omitempty"`
+
+	// RankedBy How items are ordered
+	RankedBy *DiscoveryScopeRankedBy `json:"rankedBy,omitempty"`
+
+	// SampledEntries ISSN groups seen in the corpus but unknown to the metrics table; never counted as proved journals
+	SampledEntries *int `json:"sampledEntries,omitempty"`
+
+	// Shown Items in this page (and rendered in the text form)
+	Shown *int `json:"shown,omitempty"`
+
+	// TitleOnly Journals known only by a title (points with no ISSN)
+	TitleOnly *int `json:"titleOnly,omitempty"`
+
+	// Total Proved distinct journals (or items) in this scope
+	Total int `json:"total"`
+
+	// TruncatedInventory True when the inventory is incomplete (limits or deadline)
+	TruncatedInventory *bool `json:"truncatedInventory,omitempty"`
+
+	// Unranked Journals with no metrics (sampled or title-only entries); never ranked
+	Unranked *[]DiscoveryJournalItem `json:"unranked,omitempty"`
+
+	// UnresolvedIssns ISSNs that could not be resolved to a title
+	UnresolvedIssns *int `json:"unresolvedIssns,omitempty"`
+}
+
+// DiscoveryScope_Items_Item defines model for DiscoveryScope.items.Item.
+type DiscoveryScope_Items_Item struct {
+	union json.RawMessage
+}
+
+// DiscoveryScopeRankedBy How items are ordered
+type DiscoveryScopeRankedBy string
 
 // Error defines model for Error.
 type Error struct {
@@ -233,6 +539,9 @@ type PreviewResult struct {
 	// Metadata Document metadata (title, authors, journal, etc.). Always present on /search/preview and /search/unlock, which take no includeMetadata option. On /search/results it is null when the original search set includeMetadata to false. `figures` (captions, and `image_data` when images were requested) is present only on unlocked results — a locked result reports `figureCount` and nothing else about its figures.
 	Metadata *map[string]interface{} `json:"metadata,omitempty"`
 
+	// Relevance How well this passage answers the query, 0 to 1, rounded to three decimals. It scores the passage, not the paper. Null when the result has no score, including rows cached before this field existed.
+	Relevance *float32 `json:"relevance,omitempty"`
+
 	// Text Full chunk text when `locked` is false. A short teaser snippet — never the full chunk — when `locked` is true.
 	Text string `json:"text"`
 
@@ -247,6 +556,9 @@ type PreviewUnlockResponse struct {
 
 	// CostToUnlockRemaining Cost to unlock every result not yet unlocked. An estimate, not a binding quote: it is summed from each result's own individually-rounded cost, while the amount actually charged on the next unlock is computed per collection at that call's combined token total — the two can differ by a rounding fraction.
 	CostToUnlockRemaining string `json:"costToUnlockRemaining"`
+
+	// Discovery A catalogue answer: what data sources, publishers or journals your key can reach. Present only when the query asked about the catalogue rather than for literature; then `results` is empty and nothing was charged (`X-Query-Cost: 0.000000`).
+	Discovery *DiscoveryAnswer `json:"discovery,omitempty"`
 
 	// FilterWarnings Advisory warnings about the supplied filter — for example filtering on a known field with no payload index, which is matched by scanning, or a collection excluded because it holds only open-access content and the filter asked for open_access=false. The search still runs. Omitted when there are none.
 	FilterWarnings *[]FilterWarning `json:"filterWarnings,omitempty"`
@@ -269,6 +581,9 @@ type QueryUnderstanding struct {
 	// Aspects Facets asked about the entity (e.g. mechanism of action, dermal penetration, clinical outcomes)
 	Aspects *[]string `json:"aspects,omitempty"`
 
+	// CaseSummary For a long query such as a patient case: the summary the results were judged against. Empty for an ordinary query.
+	CaseSummary *string `json:"caseSummary,omitempty"`
+
 	// Entities Entities the query is about (substances, genes, diseases, organisms, methods)
 	Entities *[]string `json:"entities,omitempty"`
 
@@ -277,6 +592,9 @@ type QueryUnderstanding struct {
 
 	// Intent What the query is asking for
 	Intent *string `json:"intent,omitempty"`
+
+	// SubQuestions The separate problems a long query was split into, each searched and given result slots on its own. Empty for a single-question query.
+	SubQuestions *[]string `json:"subQuestions,omitempty"`
 }
 
 // QuotaInfo defines model for QuotaInfo.
@@ -332,7 +650,7 @@ type SearchPreviewRequest struct {
 	//
 	// Indexed on every collection (a field that is not a known result metadata field is rejected; a known field without an index, such as `pmid`, is matched by scanning and returns a `filterWarnings` entry, and is rejected on a collection that has no index for it): `article_type`, `chapter_authors`, `chapter_number`, `chapter_title`, `doi`, `isbn`, `issn`, `journal`, `keywords`, `open_access`, `publication_date`, `publisher`, `section`.
 	//
-	// Indexed on the editorial collections only: `last_updated_date`, `medical_board_approved`, `topic`, `url`.
+	// Indexed on the editorial collections only: `has_results`, `last_updated_date`, `medical_board_approved`, `nct_id`, `overall_status`, `phases`, `topic`, `url`.
 	//
 	// `open_access` is also answered for a collection that holds only open-access content and carries no such field: `true` matches everything there, `false` (or the field under `or` / `not`) excludes that collection with a `filterWarnings` entry. `license` is returned in result metadata but is not filterable.
 	//
@@ -368,7 +686,7 @@ type SearchRequest struct {
 	//
 	// Indexed on every collection (a field that is not a known result metadata field is rejected; a known field without an index, such as `pmid`, is matched by scanning and returns a `filterWarnings` entry, and is rejected on a collection that has no index for it): `article_type`, `chapter_authors`, `chapter_number`, `chapter_title`, `doi`, `isbn`, `issn`, `journal`, `keywords`, `open_access`, `publication_date`, `publisher`, `section`.
 	//
-	// Indexed on the editorial collections only: `last_updated_date`, `medical_board_approved`, `topic`, `url`.
+	// Indexed on the editorial collections only: `has_results`, `last_updated_date`, `medical_board_approved`, `nct_id`, `overall_status`, `phases`, `topic`, `url`.
 	//
 	// `open_access` is also answered for a collection that holds only open-access content and carries no such field: `true` matches everything there, `false` (or the field under `or` / `not`) excludes that collection with a `filterWarnings` entry. `license` is returned in result metadata but is not filterable.
 	//
@@ -401,6 +719,9 @@ type SearchRequest struct {
 
 // SearchResponse defines model for SearchResponse.
 type SearchResponse struct {
+	// Discovery A catalogue answer: what data sources, publishers or journals your key can reach. Present only when the query asked about the catalogue rather than for literature; then `results` is empty and nothing was charged (`X-Query-Cost: 0.000000`).
+	Discovery *DiscoveryAnswer `json:"discovery,omitempty"`
+
 	// FilterWarnings Advisory warnings about the supplied filter — for example filtering on a known field with no payload index, which is matched by scanning, or a collection excluded because it holds only open-access content and the filter asked for open_access=false. The search still runs. Omitted when there are none.
 	FilterWarnings *[]FilterWarning `json:"filterWarnings,omitempty"`
 
@@ -430,6 +751,9 @@ type SearchResult struct {
 
 	// Metadata Document metadata (title, authors, journal, etc.). Null when includeMetadata is false.
 	Metadata *map[string]interface{} `json:"metadata,omitempty"`
+
+	// Relevance How well this passage answers the query, 0 to 1, rounded to three decimals. It scores the passage, not the paper. Null when the result has no score, including rows cached before this field existed.
+	Relevance *float32 `json:"relevance,omitempty"`
 
 	// Text Chunk text content
 	Text string `json:"text"`
@@ -474,6 +798,24 @@ type UnlockRequest struct {
 	ResultIds *[]string `json:"resultIds,omitempty"`
 }
 
+// ListCollectionJournalsParams defines parameters for ListCollectionJournals.
+type ListCollectionJournalsParams struct {
+	// Topic Rank journals by their relevant content on this topic.
+	Topic *string `form:"topic,omitempty" json:"topic,omitempty"`
+
+	// Publisher Narrow to one publisher.
+	Publisher *string `form:"publisher,omitempty" json:"publisher,omitempty"`
+
+	// MinHIndex Minimum h-index.
+	MinHIndex *int `form:"min_h_index,omitempty" json:"min_h_index,omitempty"`
+
+	// Limit Journals per page.
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Offset Rank of the first journal to return, zero-based.
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+}
+
 // SearchPreviewParams defines parameters for SearchPreview.
 type SearchPreviewParams struct {
 	// IdempotencyKey Optional, 1-255 characters, scoped to your organization and kept for 24 hours. A repeat with the same key and the same body runs no new search: it returns the original `queryId`, rendered through the unlock ledger, so rows already unlocked come back in full with `locked: false`. Every row keeps its `cost` and `tokens`. The same key with a different body is a 422 `IDEMPOTENCY_KEY_REUSED`. A repeat while the first request is still running is a 409 `IDEMPOTENCY_KEY_IN_PROGRESS`, so retry it. If the original preview has expired, the request runs a new preview and the key moves to it. The response says which happened in `Idempotency-Status`.
@@ -509,7 +851,7 @@ type SearchCollectionJSONBody struct {
 	//
 	// Indexed on every collection (a field that is not a known result metadata field is rejected; a known field without an index, such as `pmid`, is matched by scanning and returns a `filterWarnings` entry, and is rejected on a collection that has no index for it): `article_type`, `chapter_authors`, `chapter_number`, `chapter_title`, `doi`, `isbn`, `issn`, `journal`, `keywords`, `open_access`, `publication_date`, `publisher`, `section`.
 	//
-	// Indexed on the editorial collections only: `last_updated_date`, `medical_board_approved`, `topic`, `url`.
+	// Indexed on the editorial collections only: `has_results`, `last_updated_date`, `medical_board_approved`, `nct_id`, `overall_status`, `phases`, `topic`, `url`.
 	//
 	// `open_access` is also answered for a collection that holds only open-access content and carries no such field: `true` matches everything there, `false` (or the field under `or` / `not`) excludes that collection with a `filterWarnings` entry. `license` is returned in result metadata but is not filterable.
 	//
@@ -554,6 +896,94 @@ type SearchUnlockJSONRequestBody = UnlockRequest
 
 // SearchCollectionJSONRequestBody defines body for SearchCollection for application/json ContentType.
 type SearchCollectionJSONRequestBody SearchCollectionJSONBody
+
+// AsDiscoveryJournalItem returns the union data inside the DiscoveryScope_Items_Item as a DiscoveryJournalItem
+func (t DiscoveryScope_Items_Item) AsDiscoveryJournalItem() (DiscoveryJournalItem, error) {
+	var body DiscoveryJournalItem
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromDiscoveryJournalItem overwrites any union data inside the DiscoveryScope_Items_Item as the provided DiscoveryJournalItem
+func (t *DiscoveryScope_Items_Item) FromDiscoveryJournalItem(v DiscoveryJournalItem) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeDiscoveryJournalItem performs a merge with any union data inside the DiscoveryScope_Items_Item, using the provided DiscoveryJournalItem
+func (t *DiscoveryScope_Items_Item) MergeDiscoveryJournalItem(v DiscoveryJournalItem) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsDiscoveryCollectionItem returns the union data inside the DiscoveryScope_Items_Item as a DiscoveryCollectionItem
+func (t DiscoveryScope_Items_Item) AsDiscoveryCollectionItem() (DiscoveryCollectionItem, error) {
+	var body DiscoveryCollectionItem
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromDiscoveryCollectionItem overwrites any union data inside the DiscoveryScope_Items_Item as the provided DiscoveryCollectionItem
+func (t *DiscoveryScope_Items_Item) FromDiscoveryCollectionItem(v DiscoveryCollectionItem) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeDiscoveryCollectionItem performs a merge with any union data inside the DiscoveryScope_Items_Item, using the provided DiscoveryCollectionItem
+func (t *DiscoveryScope_Items_Item) MergeDiscoveryCollectionItem(v DiscoveryCollectionItem) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsDiscoveryPublisherItem returns the union data inside the DiscoveryScope_Items_Item as a DiscoveryPublisherItem
+func (t DiscoveryScope_Items_Item) AsDiscoveryPublisherItem() (DiscoveryPublisherItem, error) {
+	var body DiscoveryPublisherItem
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromDiscoveryPublisherItem overwrites any union data inside the DiscoveryScope_Items_Item as the provided DiscoveryPublisherItem
+func (t *DiscoveryScope_Items_Item) FromDiscoveryPublisherItem(v DiscoveryPublisherItem) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeDiscoveryPublisherItem performs a merge with any union data inside the DiscoveryScope_Items_Item, using the provided DiscoveryPublisherItem
+func (t *DiscoveryScope_Items_Item) MergeDiscoveryPublisherItem(v DiscoveryPublisherItem) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t DiscoveryScope_Items_Item) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *DiscoveryScope_Items_Item) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
 
 // RequestEditorFn is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
@@ -662,6 +1092,13 @@ type ClientInterface interface {
 	// Corresponds with GET /api/v1/search/collections (the `ListCollections` operationId).
 	ListCollections(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListCollectionJournals List the journals your key can reach in a collection
+	//
+	// Free. Journals present in your scope of the collection, ranked by h-index (each with its journal_metric.impact_factor, an impact factor computed by Redpine from OpenAlex citation data with the JIF formula. It is not Clarivate's Journal Impact Factor. Journals that publish many news items, letters and editorials (for example BMJ, JAMA, The Lancet) score far below their JCR figure, because OpenAlex classifies those items as articles.), or with `topic` by the relevant content each journal holds on it. Only journals anchored to the metrics table count as proved; sampled, title-only and unresolved entries are reported beside the total. Each journal carries the ISSNs to filter a search on.
+	//
+	// Corresponds with GET /api/v1/search/collections/{name}/journals (the `ListCollectionJournals` operationId).
+	ListCollectionJournals(ctx context.Context, name string, params *ListCollectionJournalsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// SearchPreviewWithBody Preview search results without charging
 	//
 	// Run the same pipeline as POST /api/v1/search/query -- same entitlement checks, same retraction filtering, same relevance ranking -- but never charge for it. Every result comes back locked, with a teaser snippet in `text` and the cost to unlock it. Works even at a zero balance. Consumes no credits, no trial query and no quota.
@@ -690,7 +1127,7 @@ type ClientInterface interface {
 
 	// SearchQueryWithBody Search documents
 	//
-	// Search one or more collections using natural language or keyword queries. Results are ranked by relevance using hybrid retrieval (dense + sparse + reranking). Pass `collections` (up to 5) to search several collections in one call and receive a single merged, relevance-ranked list with per-result origin labels.
+	// Search one or more collections using natural language or keyword queries. Results are ranked by relevance using hybrid retrieval (dense + sparse). Pass `collections` (up to 5) to search several collections in one call and receive a single merged, relevance-ranked list with per-result origin labels.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -699,7 +1136,7 @@ type ClientInterface interface {
 
 	// SearchQuery Search documents
 	//
-	// Search one or more collections using natural language or keyword queries. Results are ranked by relevance using hybrid retrieval (dense + sparse + reranking). Pass `collections` (up to 5) to search several collections in one call and receive a single merged, relevance-ranked list with per-result origin labels.
+	// Search one or more collections using natural language or keyword queries. Results are ranked by relevance using hybrid retrieval (dense + sparse). Pass `collections` (up to 5) to search several collections in one call and receive a single merged, relevance-ranked list with per-result origin labels.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -826,6 +1263,23 @@ func (c *Client) ListCollections(ctx context.Context, reqEditors ...RequestEdito
 	return c.Client.Do(req)
 }
 
+// ListCollectionJournals List the journals your key can reach in a collection
+//
+// Free. Journals present in your scope of the collection, ranked by h-index (each with its journal_metric.impact_factor, an impact factor computed by Redpine from OpenAlex citation data with the JIF formula. It is not Clarivate's Journal Impact Factor. Journals that publish many news items, letters and editorials (for example BMJ, JAMA, The Lancet) score far below their JCR figure, because OpenAlex classifies those items as articles.), or with `topic` by the relevant content each journal holds on it. Only journals anchored to the metrics table count as proved; sampled, title-only and unresolved entries are reported beside the total. Each journal carries the ISSNs to filter a search on.
+//
+// Corresponds with GET /api/v1/search/collections/{name}/journals (the `ListCollectionJournals` operationId).
+func (c *Client) ListCollectionJournals(ctx context.Context, name string, params *ListCollectionJournalsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListCollectionJournalsRequest(c.Server, name, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // SearchPreviewWithBody Preview search results without charging
 //
 // Run the same pipeline as POST /api/v1/search/query -- same entitlement checks, same retraction filtering, same relevance ranking -- but never charge for it. Every result comes back locked, with a teaser snippet in `text` and the cost to unlock it. Works even at a zero balance. Consumes no credits, no trial query and no quota.
@@ -874,7 +1328,7 @@ func (c *Client) SearchPreview(ctx context.Context, params *SearchPreviewParams,
 
 // SearchQueryWithBody Search documents
 //
-// Search one or more collections using natural language or keyword queries. Results are ranked by relevance using hybrid retrieval (dense + sparse + reranking). Pass `collections` (up to 5) to search several collections in one call and receive a single merged, relevance-ranked list with per-result origin labels.
+// Search one or more collections using natural language or keyword queries. Results are ranked by relevance using hybrid retrieval (dense + sparse). Pass `collections` (up to 5) to search several collections in one call and receive a single merged, relevance-ranked list with per-result origin labels.
 //
 // Takes any type of body and a specified content type.
 //
@@ -893,7 +1347,7 @@ func (c *Client) SearchQueryWithBody(ctx context.Context, contentType string, bo
 
 // SearchQuery Search documents
 //
-// Search one or more collections using natural language or keyword queries. Results are ranked by relevance using hybrid retrieval (dense + sparse + reranking). Pass `collections` (up to 5) to search several collections in one call and receive a single merged, relevance-ranked list with per-result origin labels.
+// Search one or more collections using natural language or keyword queries. Results are ranked by relevance using hybrid retrieval (dense + sparse). Pass `collections` (up to 5) to search several collections in one call and receive a single merged, relevance-ranked list with per-result origin labels.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -1083,6 +1537,115 @@ func NewListCollectionsRequest(server string) (*http.Request, error) {
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListCollectionJournalsRequest constructs an http.Request for the ListCollectionJournals method
+func NewListCollectionJournalsRequest(server string, name string, params *ListCollectionJournalsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/search/collections/%s/journals", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Topic != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "topic", *params.Topic, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Publisher != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "publisher", *params.Publisher, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.MinHIndex != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "min_h_index", *params.MinHIndex, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Offset != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "offset", *params.Offset, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
 	}
 
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
@@ -1478,6 +2041,15 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /api/v1/search/collections (the `ListCollections` operationId).
 	ListCollectionsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListCollectionsResponse, error)
 
+	// ListCollectionJournalsWithResponse List the journals your key can reach in a collection
+	//
+	// Free. Journals present in your scope of the collection, ranked by h-index (each with its journal_metric.impact_factor, an impact factor computed by Redpine from OpenAlex citation data with the JIF formula. It is not Clarivate's Journal Impact Factor. Journals that publish many news items, letters and editorials (for example BMJ, JAMA, The Lancet) score far below their JCR figure, because OpenAlex classifies those items as articles.), or with `topic` by the relevant content each journal holds on it. Only journals anchored to the metrics table count as proved; sampled, title-only and unresolved entries are reported beside the total. Each journal carries the ISSNs to filter a search on.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/search/collections/{name}/journals (the `ListCollectionJournals` operationId).
+	ListCollectionJournalsWithResponse(ctx context.Context, name string, params *ListCollectionJournalsParams, reqEditors ...RequestEditorFn) (*ListCollectionJournalsResponse, error)
+
 	// SearchPreviewWithBodyWithResponse Preview search results without charging
 	//
 	// Run the same pipeline as POST /api/v1/search/query -- same entitlement checks, same retraction filtering, same relevance ranking -- but never charge for it. Every result comes back locked, with a teaser snippet in `text` and the cost to unlock it. Works even at a zero balance. Consumes no credits, no trial query and no quota.
@@ -1506,7 +2078,7 @@ type ClientWithResponsesInterface interface {
 
 	// SearchQueryWithBodyWithResponse Search documents
 	//
-	// Search one or more collections using natural language or keyword queries. Results are ranked by relevance using hybrid retrieval (dense + sparse + reranking). Pass `collections` (up to 5) to search several collections in one call and receive a single merged, relevance-ranked list with per-result origin labels.
+	// Search one or more collections using natural language or keyword queries. Results are ranked by relevance using hybrid retrieval (dense + sparse). Pass `collections` (up to 5) to search several collections in one call and receive a single merged, relevance-ranked list with per-result origin labels.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -1515,7 +2087,7 @@ type ClientWithResponsesInterface interface {
 
 	// SearchQueryWithResponse Search documents
 	//
-	// Search one or more collections using natural language or keyword queries. Results are ranked by relevance using hybrid retrieval (dense + sparse + reranking). Pass `collections` (up to 5) to search several collections in one call and receive a single merged, relevance-ranked list with per-result origin labels.
+	// Search one or more collections using natural language or keyword queries. Results are ranked by relevance using hybrid retrieval (dense + sparse). Pass `collections` (up to 5) to search several collections in one call and receive a single merged, relevance-ranked list with per-result origin labels.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -1728,6 +2300,83 @@ func (r ListCollectionsResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r ListCollectionsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ListCollectionJournalsResponse200Headers the declared response headers of an HTTP 200 response for ListCollectionJournals
+type ListCollectionJournalsResponse200Headers struct {
+	XQueryCost  *string
+	XTokensUsed *int
+}
+
+type ListCollectionJournalsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *DiscoveryAnswer
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *ListCollectionJournalsResponse200Headers
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListCollectionJournalsResponse) GetJSON200() *DiscoveryAnswer {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r ListCollectionJournalsResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r ListCollectionJournalsResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r ListCollectionJournalsResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r ListCollectionJournalsResponse) GetJSON503() *Error {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r ListCollectionJournalsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListCollectionJournalsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListCollectionJournalsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListCollectionJournalsResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -2286,6 +2935,21 @@ func (c *ClientWithResponses) ListCollectionsWithResponse(ctx context.Context, r
 	return ParseListCollectionsResponse(rsp)
 }
 
+// ListCollectionJournalsWithResponse List the journals your key can reach in a collection
+//
+// Free. Journals present in your scope of the collection, ranked by h-index (each with its journal_metric.impact_factor, an impact factor computed by Redpine from OpenAlex citation data with the JIF formula. It is not Clarivate's Journal Impact Factor. Journals that publish many news items, letters and editorials (for example BMJ, JAMA, The Lancet) score far below their JCR figure, because OpenAlex classifies those items as articles.), or with `topic` by the relevant content each journal holds on it. Only journals anchored to the metrics table count as proved; sampled, title-only and unresolved entries are reported beside the total. Each journal carries the ISSNs to filter a search on.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/search/collections/{name}/journals (the `ListCollectionJournals` operationId).
+func (c *ClientWithResponses) ListCollectionJournalsWithResponse(ctx context.Context, name string, params *ListCollectionJournalsParams, reqEditors ...RequestEditorFn) (*ListCollectionJournalsResponse, error) {
+	rsp, err := c.ListCollectionJournals(ctx, name, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListCollectionJournalsResponse(rsp)
+}
+
 // SearchPreviewWithBodyWithResponse Preview search results without charging
 //
 // Run the same pipeline as POST /api/v1/search/query -- same entitlement checks, same retraction filtering, same relevance ranking -- but never charge for it. Every result comes back locked, with a teaser snippet in `text` and the cost to unlock it. Works even at a zero balance. Consumes no credits, no trial query and no quota.
@@ -2326,7 +2990,7 @@ func (c *ClientWithResponses) SearchPreviewWithResponse(ctx context.Context, par
 
 // SearchQueryWithBodyWithResponse Search documents
 //
-// Search one or more collections using natural language or keyword queries. Results are ranked by relevance using hybrid retrieval (dense + sparse + reranking). Pass `collections` (up to 5) to search several collections in one call and receive a single merged, relevance-ranked list with per-result origin labels.
+// Search one or more collections using natural language or keyword queries. Results are ranked by relevance using hybrid retrieval (dense + sparse). Pass `collections` (up to 5) to search several collections in one call and receive a single merged, relevance-ranked list with per-result origin labels.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -2341,7 +3005,7 @@ func (c *ClientWithResponses) SearchQueryWithBodyWithResponse(ctx context.Contex
 
 // SearchQueryWithResponse Search documents
 //
-// Search one or more collections using natural language or keyword queries. Results are ranked by relevance using hybrid retrieval (dense + sparse + reranking). Pass `collections` (up to 5) to search several collections in one call and receive a single merged, relevance-ranked list with per-result origin labels.
+// Search one or more collections using natural language or keyword queries. Results are ranked by relevance using hybrid retrieval (dense + sparse). Pass `collections` (up to 5) to search several collections in one call and receive a single merged, relevance-ranked list with per-result origin labels.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -2608,6 +3272,80 @@ func ParseListCollectionsResponse(rsp *http.Response) (*ListCollectionsResponse,
 		}
 		response.JSON429 = &dest
 
+	}
+
+	return response, nil
+}
+
+// ParseListCollectionJournalsResponse parses an HTTP response from a ListCollectionJournalsWithResponse call
+func ParseListCollectionJournalsResponse(rsp *http.Response) (*ListCollectionJournalsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListCollectionJournalsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DiscoveryAnswer
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers ListCollectionJournalsResponse200Headers
+		if values := rsp.Header.Values("X-Query-Cost"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Query-Cost", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XQueryCost = &value
+		}
+		if values := rsp.Header.Values("X-Tokens-Used"); len(values) > 0 {
+			var value int
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Tokens-Used", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XTokensUsed = &value
+		}
+		response.Headers200 = &headers
 	}
 
 	return response, nil
