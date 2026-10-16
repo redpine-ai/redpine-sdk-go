@@ -134,27 +134,6 @@ func (e DiscoveryPublisherItemKind) Valid() bool {
 	}
 }
 
-// Defines values for DiscoveryScopeRankedBy.
-const (
-	HIndex          DiscoveryScopeRankedBy = "h_index"
-	LessThannil     DiscoveryScopeRankedBy = "<nil>"
-	RelevantContent DiscoveryScopeRankedBy = "relevant_content"
-)
-
-// Valid indicates whether the value is a known member of the DiscoveryScopeRankedBy enum.
-func (e DiscoveryScopeRankedBy) Valid() bool {
-	switch e {
-	case HIndex:
-		return true
-	case LessThannil:
-		return true
-	case RelevantContent:
-		return true
-	default:
-		return false
-	}
-}
-
 // AssistedBillingInfo What was actually charged — only delivered, verified results are billed.
 type AssistedBillingInfo struct {
 	// ChargedResults Number of results billed
@@ -338,8 +317,8 @@ type DiscoveryCollectionItem struct {
 	Description *string `json:"description,omitempty"`
 
 	// DisplayName Display name
-	DisplayName string                       `json:"displayName"`
-	Kind        *DiscoveryCollectionItemKind `json:"kind,omitempty"`
+	DisplayName string                      `json:"displayName"`
+	Kind        DiscoveryCollectionItemKind `json:"kind"`
 
 	// Members Member display names (metas only)
 	Members *[]string `json:"members,omitempty"`
@@ -382,8 +361,8 @@ type DiscoveryJournalItem struct {
 	IssnL *string `json:"issnL,omitempty"`
 
 	// Issns The journal's ISSNs present in your scope; filter on these to search it
-	Issns *[]string                 `json:"issns,omitempty"`
-	Kind  *DiscoveryJournalItemKind `json:"kind,omitempty"`
+	Issns *[]string                `json:"issns,omitempty"`
+	Kind  DiscoveryJournalItemKind `json:"kind"`
 
 	// Publisher Publisher, when known
 	Publisher *string `json:"publisher,omitempty"`
@@ -407,8 +386,8 @@ type DiscoveryNextAction struct {
 // DiscoveryPublisherItem defines model for DiscoveryPublisherItem.
 type DiscoveryPublisherItem struct {
 	// Collections Collections (display names) it appears in
-	Collections *[]string                   `json:"collections,omitempty"`
-	Kind        *DiscoveryPublisherItemKind `json:"kind,omitempty"`
+	Collections *[]string                  `json:"collections,omitempty"`
+	Kind        DiscoveryPublisherItemKind `json:"kind"`
 
 	// Name Publisher name as stored in the corpus
 	Name string `json:"name"`
@@ -440,8 +419,8 @@ type DiscoveryScope struct {
 	// Publishers Publishers present in your scope of this collection
 	Publishers *[]string `json:"publishers,omitempty"`
 
-	// RankedBy How items are ordered
-	RankedBy *DiscoveryScopeRankedBy `json:"rankedBy,omitempty"`
+	// RankedBy How items are ordered: `h_index` or `relevant_content`; null when the items are not ranked
+	RankedBy *string `json:"rankedBy,omitempty"`
 
 	// SampledEntries ISSN groups seen in the corpus but unknown to the metrics table; never counted as proved journals
 	SampledEntries *int `json:"sampledEntries,omitempty"`
@@ -469,9 +448,6 @@ type DiscoveryScope struct {
 type DiscoveryScope_Items_Item struct {
 	union json.RawMessage
 }
-
-// DiscoveryScopeRankedBy How items are ordered
-type DiscoveryScopeRankedBy string
 
 // Error defines model for Error.
 type Error struct {
@@ -539,7 +515,7 @@ type PreviewResult struct {
 	// Metadata Document metadata (title, authors, journal, etc.). Always present on /search/preview and /search/unlock, which take no includeMetadata option. On /search/results it is null when the original search set includeMetadata to false. `figures` (captions, and `image_data` when images were requested) is present only on unlocked results — a locked result reports `figureCount` and nothing else about its figures.
 	Metadata *map[string]interface{} `json:"metadata,omitempty"`
 
-	// Relevance How well this passage answers the query, 0 to 1, rounded to three decimals. It scores the passage, not the paper. Null when the result has no score, including rows cached before this field existed.
+	// Relevance How well this passage answers the query, 0 to 1, rounded to three decimals. Null when the result has no score, including rows cached before this field existed.
 	Relevance *float32 `json:"relevance,omitempty"`
 
 	// Text Full chunk text when `locked` is false. A short teaser snippet — never the full chunk — when `locked` is true.
@@ -752,7 +728,7 @@ type SearchResult struct {
 	// Metadata Document metadata (title, authors, journal, etc.). Null when includeMetadata is false.
 	Metadata *map[string]interface{} `json:"metadata,omitempty"`
 
-	// Relevance How well this passage answers the query, 0 to 1, rounded to three decimals. It scores the passage, not the paper. Null when the result has no score, including rows cached before this field existed.
+	// Relevance How well this passage answers the query, 0 to 1, rounded to three decimals. Null when the result has no score, including rows cached before this field existed.
 	Relevance *float32 `json:"relevance,omitempty"`
 
 	// Text Chunk text content
@@ -1101,7 +1077,7 @@ type ClientInterface interface {
 
 	// SearchPreviewWithBody Preview search results without charging
 	//
-	// Run the same pipeline as POST /api/v1/search/query -- same entitlement checks, same retraction filtering, same relevance ranking -- but never charge for it. Every result comes back locked, with a teaser snippet in `text` and the cost to unlock it. Works even at a zero balance. Consumes no credits, no trial query and no quota.
+	// Run the same pipeline as POST /api/v1/search/query -- same entitlement checks, same retraction filtering, same relevance ranking -- but never charge for it. Every result of a new preview comes back locked, with a teaser snippet in `text` and the cost to unlock it. Works even at a zero balance. Consumes no credits, no trial query and no quota.
 	//
 	// Call POST /api/v1/search/unlock with the returned `queryId` to pay for and receive some or all of the results in full.
 	//
@@ -1114,7 +1090,7 @@ type ClientInterface interface {
 
 	// SearchPreview Preview search results without charging
 	//
-	// Run the same pipeline as POST /api/v1/search/query -- same entitlement checks, same retraction filtering, same relevance ranking -- but never charge for it. Every result comes back locked, with a teaser snippet in `text` and the cost to unlock it. Works even at a zero balance. Consumes no credits, no trial query and no quota.
+	// Run the same pipeline as POST /api/v1/search/query -- same entitlement checks, same retraction filtering, same relevance ranking -- but never charge for it. Every result of a new preview comes back locked, with a teaser snippet in `text` and the cost to unlock it. Works even at a zero balance. Consumes no credits, no trial query and no quota.
 	//
 	// Call POST /api/v1/search/unlock with the returned `queryId` to pay for and receive some or all of the results in full.
 	//
@@ -1282,7 +1258,7 @@ func (c *Client) ListCollectionJournals(ctx context.Context, name string, params
 
 // SearchPreviewWithBody Preview search results without charging
 //
-// Run the same pipeline as POST /api/v1/search/query -- same entitlement checks, same retraction filtering, same relevance ranking -- but never charge for it. Every result comes back locked, with a teaser snippet in `text` and the cost to unlock it. Works even at a zero balance. Consumes no credits, no trial query and no quota.
+// Run the same pipeline as POST /api/v1/search/query -- same entitlement checks, same retraction filtering, same relevance ranking -- but never charge for it. Every result of a new preview comes back locked, with a teaser snippet in `text` and the cost to unlock it. Works even at a zero balance. Consumes no credits, no trial query and no quota.
 //
 // Call POST /api/v1/search/unlock with the returned `queryId` to pay for and receive some or all of the results in full.
 //
@@ -1305,7 +1281,7 @@ func (c *Client) SearchPreviewWithBody(ctx context.Context, params *SearchPrevie
 
 // SearchPreview Preview search results without charging
 //
-// Run the same pipeline as POST /api/v1/search/query -- same entitlement checks, same retraction filtering, same relevance ranking -- but never charge for it. Every result comes back locked, with a teaser snippet in `text` and the cost to unlock it. Works even at a zero balance. Consumes no credits, no trial query and no quota.
+// Run the same pipeline as POST /api/v1/search/query -- same entitlement checks, same retraction filtering, same relevance ranking -- but never charge for it. Every result of a new preview comes back locked, with a teaser snippet in `text` and the cost to unlock it. Works even at a zero balance. Consumes no credits, no trial query and no quota.
 //
 // Call POST /api/v1/search/unlock with the returned `queryId` to pay for and receive some or all of the results in full.
 //
@@ -2052,7 +2028,7 @@ type ClientWithResponsesInterface interface {
 
 	// SearchPreviewWithBodyWithResponse Preview search results without charging
 	//
-	// Run the same pipeline as POST /api/v1/search/query -- same entitlement checks, same retraction filtering, same relevance ranking -- but never charge for it. Every result comes back locked, with a teaser snippet in `text` and the cost to unlock it. Works even at a zero balance. Consumes no credits, no trial query and no quota.
+	// Run the same pipeline as POST /api/v1/search/query -- same entitlement checks, same retraction filtering, same relevance ranking -- but never charge for it. Every result of a new preview comes back locked, with a teaser snippet in `text` and the cost to unlock it. Works even at a zero balance. Consumes no credits, no trial query and no quota.
 	//
 	// Call POST /api/v1/search/unlock with the returned `queryId` to pay for and receive some or all of the results in full.
 	//
@@ -2065,7 +2041,7 @@ type ClientWithResponsesInterface interface {
 
 	// SearchPreviewWithResponse Preview search results without charging
 	//
-	// Run the same pipeline as POST /api/v1/search/query -- same entitlement checks, same retraction filtering, same relevance ranking -- but never charge for it. Every result comes back locked, with a teaser snippet in `text` and the cost to unlock it. Works even at a zero balance. Consumes no credits, no trial query and no quota.
+	// Run the same pipeline as POST /api/v1/search/query -- same entitlement checks, same retraction filtering, same relevance ranking -- but never charge for it. Every result of a new preview comes back locked, with a teaser snippet in `text` and the cost to unlock it. Works even at a zero balance. Consumes no credits, no trial query and no quota.
 	//
 	// Call POST /api/v1/search/unlock with the returned `queryId` to pay for and receive some or all of the results in full.
 	//
@@ -2952,7 +2928,7 @@ func (c *ClientWithResponses) ListCollectionJournalsWithResponse(ctx context.Con
 
 // SearchPreviewWithBodyWithResponse Preview search results without charging
 //
-// Run the same pipeline as POST /api/v1/search/query -- same entitlement checks, same retraction filtering, same relevance ranking -- but never charge for it. Every result comes back locked, with a teaser snippet in `text` and the cost to unlock it. Works even at a zero balance. Consumes no credits, no trial query and no quota.
+// Run the same pipeline as POST /api/v1/search/query -- same entitlement checks, same retraction filtering, same relevance ranking -- but never charge for it. Every result of a new preview comes back locked, with a teaser snippet in `text` and the cost to unlock it. Works even at a zero balance. Consumes no credits, no trial query and no quota.
 //
 // Call POST /api/v1/search/unlock with the returned `queryId` to pay for and receive some or all of the results in full.
 //
@@ -2971,7 +2947,7 @@ func (c *ClientWithResponses) SearchPreviewWithBodyWithResponse(ctx context.Cont
 
 // SearchPreviewWithResponse Preview search results without charging
 //
-// Run the same pipeline as POST /api/v1/search/query -- same entitlement checks, same retraction filtering, same relevance ranking -- but never charge for it. Every result comes back locked, with a teaser snippet in `text` and the cost to unlock it. Works even at a zero balance. Consumes no credits, no trial query and no quota.
+// Run the same pipeline as POST /api/v1/search/query -- same entitlement checks, same retraction filtering, same relevance ranking -- but never charge for it. Every result of a new preview comes back locked, with a teaser snippet in `text` and the cost to unlock it. Works even at a zero balance. Consumes no credits, no trial query and no quota.
 //
 // Call POST /api/v1/search/unlock with the returned `queryId` to pay for and receive some or all of the results in full.
 //

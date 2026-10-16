@@ -488,7 +488,8 @@
                     "name",
                     "displayName",
                     "collectionKind",
-                    "revenueModel"
+                    "revenueModel",
+                    "kind"
                 ],
                 "type": "object"
             },
@@ -547,7 +548,8 @@
                     }
                 },
                 "required": [
-                    "title"
+                    "title",
+                    "kind"
                 ],
                 "type": "object"
             },
@@ -591,7 +593,8 @@
                     }
                 },
                 "required": [
-                    "name"
+                    "name",
+                    "kind"
                 ],
                 "type": "object"
             },
@@ -649,12 +652,7 @@
                     },
                     "rankedBy": {
                         "default": null,
-                        "description": "How items are ordered",
-                        "enum": [
-                            "h_index",
-                            "relevant_content",
-                            null
-                        ],
+                        "description": "How items are ordered: `h_index` or `relevant_content`; null when the items are not ranked",
                         "type": [
                             "string",
                             "null"
@@ -838,7 +836,7 @@
                     },
                     "relevance": {
                         "default": null,
-                        "description": "How well this passage answers the query, 0 to 1, rounded to three decimals. It scores the passage, not the paper. Null when the result has no score, including rows cached before this field existed.",
+                        "description": "How well this passage answers the query, 0 to 1, rounded to three decimals. Null when the result has no score, including rows cached before this field existed.",
                         "type": [
                             "number",
                             "null"
@@ -1272,7 +1270,7 @@
                     },
                     "relevance": {
                         "default": null,
-                        "description": "How well this passage answers the query, 0 to 1, rounded to three decimals. It scores the passage, not the paper. Null when the result has no score, including rows cached before this field existed.",
+                        "description": "How well this passage answers the query, 0 to 1, rounded to three decimals. Null when the result has no score, including rows cached before this field existed.",
                         "type": [
                             "number",
                             "null"
@@ -1729,7 +1727,7 @@
         },
         "/api/v1/search/preview": {
             "post": {
-                "description": "Run the same pipeline as POST /api/v1/search/query -- same entitlement checks, same retraction filtering, same relevance ranking -- but never charge for it. Every result comes back locked, with a teaser snippet in `text` and the cost to unlock it. Works even at a zero balance. Consumes no credits, no trial query and no quota.\n\nCall POST /api/v1/search/unlock with the returned `queryId` to pay for and receive some or all of the results in full.\n\nSend an `Idempotency-Key` header to make retries safe: a repeat with the same key and body returns the original `queryId` instead of buying the same results again under a new one.",
+                "description": "Run the same pipeline as POST /api/v1/search/query -- same entitlement checks, same retraction filtering, same relevance ranking -- but never charge for it. Every result of a new preview comes back locked, with a teaser snippet in `text` and the cost to unlock it. Works even at a zero balance. Consumes no credits, no trial query and no quota.\n\nCall POST /api/v1/search/unlock with the returned `queryId` to pay for and receive some or all of the results in full.\n\nSend an `Idempotency-Key` header to make retries safe: a repeat with the same key and body returns the original `queryId` instead of buying the same results again under a new one.",
                 "operationId": "searchPreview",
                 "parameters": [
                     {
@@ -1763,7 +1761,7 @@
                                 }
                             }
                         },
-                        "description": "Every result, locked, plus the total cost to unlock them all",
+                        "description": "The results, each locked unless an Idempotency-Key replay finds it already unlocked, plus the total cost to unlock the rest",
                         "headers": {
                             "Idempotency-Status": {
                                 "description": "Present only when an Idempotency-Key was sent. `created`: a preview ran (a first request, or one whose stored preview had expired). `replayed`: the stored `queryId` was returned and no search ran.",
